@@ -362,9 +362,12 @@ class Generator
         return "/**\n * {$comment}\n */";
     }
 
-    public function makeDataClass(string $table, string $namespace = null, string $class_name = null): string
+    public function makeDataClass(string $table, string $namespace_string = null, string $class_name = null): string
     {
-        $columns  = $this->getTableColumns($table);
+        $columns = $this->getTableColumns($table);
+        if (empty($columns)) {
+            throw new \RuntimeException("Table {$table} not found");
+        }
         $rules    = [];
         $allClass = [];
 
@@ -378,7 +381,7 @@ class Generator
         }
 
         $builder   = new BuilderFactory();
-        $namespace = $builder->namespace(is_null($namespace) ? $this->config->getNamespacePrefix() : $namespace);
+        $namespace = $builder->namespace(is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string);
         $allClass  = array_unique($allClass);
 
         if ($this->config->getAddFunc()
@@ -387,7 +390,7 @@ class Generator
         ) {
             $allClass[] = \Stringable::class;
         }
-        if ($namespace !== $this->config->getNamespacePrefix()) {
+        if ($namespace_string !== $this->config->getNamespacePrefix()) {
             $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
         }
 

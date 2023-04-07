@@ -36,35 +36,50 @@ class MakeMysqlDataCommand extends Command
             ->setAddComment($input->getOption('add-comment'))
             ->setTypeMap(Config::instance()->getTypeMap());
 
-        var_dump($config);
-        $table = $input->getArgument('table');
-
+        $table        = $input->getArgument('table');
         $generator    = new Generator($config);
         $newTableName = str_replace($config->getRemoveTablePrefix(), '', $table);
+        $namespace    = $config->getNamespacePrefix();
+
         if ($config->getSplitTableName()) {
             $fileNameSpace = explode('_', $newTableName);
             $newTableName  = array_pop($fileNameSpace);
             $fileNameSpace = array_map(fn ($item) => ucfirst($item), $fileNameSpace);
             $fileNameSpace = implode('\\', $fileNameSpace);
-            if (empty($config->getNamespacePrefix())) {
-                $namespace = $fileNameSpace;
-            } else {
-                $namespace = $config->getNamespacePrefix() . '\\' . $fileNameSpace;
+
+            if (!empty($fileNameSpace)) {
+                if (empty($config->getNamespacePrefix())) {
+                    $namespace = $fileNameSpace;
+                } else {
+                    $namespace = $config->getNamespacePrefix() . '\\' . $fileNameSpace;
+                }
             }
             $newTableName = ucfirst($newTableName);
-            $filePath = $config->getBasePath() . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $namespace) . DIRECTORY_SEPARATOR . $newTableName . '.php';
         } else {
-            $namespace = $config->getNamespacePrefix();
-            $filePath  = $config->getBasePath() . DIRECTORY_SEPARATOR . str_replace('\\', DIRECTORY_SEPARATOR, $config->getNamespacePrefix()).DIRECTORY_SEPARATOR . Str::studly($newTableName). '.php';
             $newTableName = Str::studly($newTableName);
         }
-        $dir = dirname($filePath);
+
+        $filePaths = [
+            $config->getBasePath(),
+            str_replace('\\', DIRECTORY_SEPARATOR, $namespace ?: ''),
+            $newTableName
+        ];
+        $filePaths = array_filter($filePaths);
+        $filePath  = implode(DIRECTORY_SEPARATOR, $filePaths) . '.php';
+        $dir       = dirname($filePath);
         if (!file_exists($dir)) {
             mkdir($dir, 0755, true);
         }
 
-        $phpCode = $generator->makeDataClass($table, $namespace, $newTableName);
+        try {
+            $phpCode = $generator->makeDataClass($table, $namespace, $newTableName);
+        } catch (\RuntimeException $e) {
+            $output->writeln("<error>{$e->getMessage()}</error>");
+            return 1;
+        }
+
         file_put_contents($filePath, $phpCode);
+        $output->writeln("<info>$table generate success</info>");
         return 0;
     }
 }
