@@ -26,6 +26,10 @@ class MakeMysqlDataCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        if (!class_exists("Itwmw\Table\Structure\Mysql\Mysql")){
+            $output->writeln("\033[0;31m\nError: Please reinstall the itwmw/validate-attributes-mysql package. To use the command-line functionality, you will need to install the dependencies in the require-dev section of this package.\033[0m");
+            return 1;
+        }
         $config = new Config();
         $config->setNamespacePrefix($input->getOption('namespace'))
             ->setAddFunc($input->getOption('add-func'))
