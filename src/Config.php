@@ -2,6 +2,8 @@
 
 namespace Itwmw\Validate\Attributes\Mysql;
 
+use Closure;
+
 class Config
 {
     protected ?string $namespacePrefix = null;
@@ -19,6 +21,8 @@ class Config
     protected string $removeTablePrefix = '';
 
     protected array $typeMap = [];
+
+    protected ?Closure $tableArgHandler = null;
 
     protected static Config $instance;
 
@@ -133,6 +137,18 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置表参数处理器
+     *
+     * @param Closure $tableArgHandler
+     * @return $this
+     */
+    public function setTableArgHandler(Closure $tableArgHandler): Config
+    {
+        $this->tableArgHandler = $tableArgHandler;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -171,5 +187,10 @@ class Config
     public function getAddComment(): bool
     {
         return $this->addComment;
+    }
+
+    public function getTableArgHandler(): ?Closure
+    {
+        return $this->tableArgHandler;
     }
 }

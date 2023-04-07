@@ -36,7 +36,10 @@ class MakeMysqlDataCommand extends Command
             ->setAddComment($input->getOption('add-comment'))
             ->setTypeMap(Config::instance()->getTypeMap());
 
-        $table        = $input->getArgument('table');
+        $table = $input->getArgument('table');
+        if (null !== $config->getTableArgHandler()) {
+            $table = call_user_func($config->getTableArgHandler(), $table);
+        }
         $generator    = new Generator($config);
         $newTableName = str_replace($config->getRemoveTablePrefix(), '', $table);
         $namespace    = $config->getNamespacePrefix();

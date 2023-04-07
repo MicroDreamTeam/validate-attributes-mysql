@@ -1,5 +1,5 @@
 {
-    "name": "itwmw/engine-validate-attributes-mysql",
+    "name": "itwmw/validate-attributes-mysql",
     "description": "微擎表单验证器Mysql注解验证",
     "autoload": {
         "psr-4": {
