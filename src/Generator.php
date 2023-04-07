@@ -123,18 +123,11 @@ class Generator
 
     public function __construct(Config $config = null)
     {
+        $this->config     = $config ?? Config::instance();
+        $this->typeMap    = array_merge($this->typeMap, $this->config->getTypeMap());
         $this->connection = new MysqlConnection();
-        $this->connection->setConnection([
-            'host'     => '127.0.0.1:3306',
-            'database' => 'test',
-            'username' => 'root',
-            'password' => 'mysql@123456',
-            'charset'  => 'utf8mb4'
-        ]);
-
-        $this->mysql   = new Mysql($this->connection);
-        $this->config  = $config ?? Config::instance();
-        $this->typeMap = array_merge($this->typeMap, $this->config->getTypeMap());
+        $this->connection->setConnection($config->getMysqlConnection());
+        $this->mysql = new Mysql($this->connection);
     }
 
     /**

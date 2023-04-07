@@ -22,6 +22,8 @@ class Config
 
     protected array $typeMap = [];
 
+    protected array $mysqlConnection = [];
+
     protected ?Closure $tableArgHandler = null;
 
     protected static Config $instance;
@@ -149,6 +151,26 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置mysql连接参数
+     *
+     * @param array{
+     *     username: string,
+     *     password: string,
+     *     host: string,
+     *     port: int,
+     *     database: string,
+     *     charset: string,
+     *     prefix: string,
+     * } $mysqlConnection
+     * @return $this
+     */
+    public function setMysqlConnection(array $mysqlConnection): Config
+    {
+        $this->mysqlConnection = $mysqlConnection;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -192,5 +214,10 @@ class Config
     public function getTableArgHandler(): ?Closure
     {
         return $this->tableArgHandler;
+    }
+
+    public function getMysqlConnection(): array
+    {
+        return $this->mysqlConnection;
     }
 }
