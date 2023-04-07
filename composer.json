@@ -1,0 +1,28 @@
+{
+    "name": "itwmw/engine-validate-attributes-mysql",
+    "description": "微擎表单验证器Mysql注解验证",
+    "autoload": {
+        "psr-4": {
+            "Itwmw\\Validate\\Attributes\\Mysql\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "虞灪",
+            "email": "995645888@qq.com"
+        }
+    ],
+    "license": "Apache-2.0",
+    "require": {
+        "php": ">=8.1",
+        "w7/engine-validate": "^5.0",
+        "itwmw/engine-validate-attributes": "^5.0",
+        "itwmw/engine-validate-mysql-rules": "^5.0",
+        "itwmw/table-structure": "^1.1.0",
+        "nikic/php-parser": "^4.15",
+        "friendsofphp/php-cs-fixer": "^3.16",
+        "symfony/console": ">=5.2"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
