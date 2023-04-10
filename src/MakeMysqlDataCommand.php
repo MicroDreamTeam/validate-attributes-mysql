@@ -30,15 +30,14 @@ class MakeMysqlDataCommand extends Command
             $output->writeln("\033[0;31m\nError: Please reinstall the itwmw/validate-attributes-mysql package. To use the command-line functionality, you will need to install the dependencies in the require-dev section of this package.\033[0m");
             return 1;
         }
-        $config = new Config();
+        $config = clone Config::instance();
         $config->setNamespacePrefix($input->getOption('namespace'))
             ->setAddFunc($input->getOption('add-func'))
             ->setAddFuncExtends($input->getOption('add-func-extends'))
             ->setSplitTableName($input->getOption('split-table-name'))
             ->setBasePath($input->getOption('base-path'))
             ->setRemoveTablePrefix($input->getOption('remove-table-prefix'))
-            ->setAddComment($input->getOption('add-comment'))
-            ->setTypeMap(Config::instance()->getTypeMap());
+            ->setAddComment($input->getOption('add-comment'));
 
         $table = $input->getArgument('table');
         if (null !== $config->getTableArgHandler()) {
