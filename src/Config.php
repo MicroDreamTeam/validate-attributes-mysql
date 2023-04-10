@@ -45,8 +45,14 @@ class Config
      */
     public function setNamespacePrefix(?string $namespacePrefix): Config
     {
-        if (!is_null($namespacePrefix) && str_ends_with($namespacePrefix, '\\')) {
-            $namespacePrefix = substr($namespacePrefix, 0, -1);
+        if (!is_null($namespacePrefix)) {
+            if (str_ends_with($namespacePrefix, '\\')) {
+                $namespacePrefix = substr($namespacePrefix, 0, -1);
+            }
+
+            if (str_starts_with($namespacePrefix, '\\')) {
+                $namespacePrefix = substr($namespacePrefix, 1);
+            }
         }
         $this->namespacePrefix = $namespacePrefix;
         return $this;
