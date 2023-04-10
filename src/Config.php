@@ -155,13 +155,16 @@ class Config
      * 设置mysql连接参数
      *
      * @param array{
+     *     url: string,
      *     username: string,
      *     password: string,
+     *     unix_socket: string,
      *     host: string,
      *     port: int,
      *     database: string,
      *     charset: string,
      *     prefix: string,
+     *     options: array,
      * } $mysqlConnection
      * @return $this
      */
