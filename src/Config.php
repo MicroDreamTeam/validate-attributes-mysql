@@ -24,6 +24,8 @@ class Config
 
     protected array $mysqlConnection = [];
 
+    protected bool $generateTrait = false;
+
     protected ?Closure $tableArgHandler = null;
 
     protected static Config $instance;
@@ -180,6 +182,20 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置是否生成trait,启用后会生成trait文件,否则生成类文件
+     *
+     * 当使用trait时,addFuncExtends设置无效
+     *
+     * @param bool $generateTrait
+     * @return $this
+     */
+    public function setGenerateTrait(bool $generateTrait): Config
+    {
+        $this->generateTrait = $generateTrait;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -228,5 +244,10 @@ class Config
     public function getMysqlConnection(): array
     {
         return $this->mysqlConnection;
+    }
+
+    public function getGenerateTrait(): bool
+    {
+        return $this->generateTrait;
     }
 }

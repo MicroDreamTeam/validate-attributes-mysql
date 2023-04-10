@@ -12,6 +12,7 @@ use Itwmw\Validate\Attributes\Rules\Numeric;
 use Itwmw\Validate\Attributes\Rules\Required;
 use Itwmw\Validate\Attributes\Rules\RuleInterface;
 use PhpParser\Builder\Class_;
+use PhpParser\Builder\Trait_;
 use PhpParser\BuilderFactory;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
@@ -274,7 +275,7 @@ class Generator
         return $default;
     }
 
-    private function addDataFunc(Class_ $class)
+    private function addDataFunc(Trait_|Class_ $class)
     {
         $builder     = new BuilderFactory();
         $toArrayFunc = $builder->method('toArray');
@@ -374,12 +375,13 @@ class Generator
         }
 
         $builder   = new BuilderFactory();
-        $namespace = $builder->namespace(is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string);
+        $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
+        $namespace = $builder->namespace($namespace_string);
         $allClass  = array_unique($allClass);
 
         if ($this->config->getAddFunc()
             && !$this->config->getAddFuncExtends()
-            && !empty($this->config->getNamespacePrefix())
+            && !empty($namespace_string)
         ) {
             $allClass[] = \Stringable::class;
         }
@@ -391,20 +393,16 @@ class Generator
             $namespace->addStmt($builder->use($class)->getNode());
         }
 
-        $class = $builder->class(is_null($class_name) ? $table : $class_name);
+        if ($this->config->getGenerateTrait()) {
+            $class = $builder->trait(is_null($class_name) ? $table : $class_name);
+        } else {
+            $class = $builder->class(is_null($class_name) ? $table : $class_name);
+        }
+
         if ($this->config->getAddComment()) {
             $tableComment = $this->mysql->getTableComment($table);
             if (!empty($tableComment)) {
                 $class->setDocComment($this->makeComment($tableComment));
-            }
-        }
-
-        if ($this->config->getAddFunc()) {
-            if ($this->config->getAddFuncExtends()) {
-                $this->makeBaseDataClass();
-                $class->extend('BaseData');
-            } else {
-                $class->implement(\Stringable::class);
             }
         }
 
@@ -434,8 +432,18 @@ class Generator
             $class->addStmt($field->getNode());
         }
 
-        if ($this->config->getAddFunc() && !$this->config->getAddFuncExtends()) {
-            $this->addDataFunc($class);
+        if ($this->config->getAddFunc()) {
+            if (!$this->config->getGenerateTrait()) {
+                if ($this->config->getAddFuncExtends()) {
+                    $this->makeBaseDataClass();
+                    $class->extend('BaseData');
+                } else {
+                    $class->implement(\Stringable::class);
+                    $this->addDataFunc($class);
+                }
+            } else {
+                $this->addDataFunc($class);
+            }
         }
 
         $namespace->addStmt($class);
