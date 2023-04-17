@@ -464,7 +464,12 @@ class Generator
                     }
                 } else {
                     if ($useConstruct) {
-                        $params[$key] = [$param, false];
+                        if ($this->config->getConstructAllOptional()) {
+                            $param->setDefault($this->getDefaultForType($type));
+                            $params[$key] = [$param, true];
+                        } else {
+                            $params[$key] = [$param, false];
+                        }
                     }
                 }
             }
@@ -489,9 +494,11 @@ class Generator
 
         if ($useConstruct) {
             $method = $builder->method('__construct');
-            uasort($params, function ($a, $b) {
-                return $a[1] <=> $b[1];
-            });
+            if (!$this->config->getConstructAllOptional()) {
+                uasort($params, function ($a, $b) {
+                    return $a[1] <=> $b[1];
+                });
+            }
             array_map(fn ($param) => $method->addParam($param[0]), $params);
             foreach ($params as $key => $param) {
                 $method->addStmt(new Expression(new Assign(new PropertyFetch(new Variable('this'), $key), new Variable($key))));
@@ -503,5 +510,20 @@ class Generator
             }
             $class->addStmt($method->getNode());
         }
+    }
+
+    private function getDefaultForType(string $type): mixed
+    {
+        if (str_contains($type, '?')) {
+            return null;
+        }
+
+        return match ($type) {
+            'int', 'float' => 0,
+            'bool'   => false,
+            'string' => '',
+            'array'  => [],
+            default  => null,
+        };
     }
 }

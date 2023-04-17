@@ -30,6 +30,8 @@ class Config
 
     protected bool $useConstruct = false;
 
+    protected bool $constructAllOptional = false;
+
     protected static Config $instance;
 
     public static function instance(): Config
@@ -210,6 +212,18 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置构造函数参数是否全部可选
+     *
+     * @param bool $constructAllOptional
+     * @return $this
+     */
+    public function setConstructAllOptional(bool $constructAllOptional): Config
+    {
+        $this->constructAllOptional = $constructAllOptional;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -268,5 +282,10 @@ class Config
     public function getUseConstruct(): bool
     {
         return $this->useConstruct;
+    }
+
+    public function getConstructAllOptional(): bool
+    {
+        return $this->constructAllOptional;
     }
 }
