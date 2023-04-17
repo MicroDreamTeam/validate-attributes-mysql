@@ -28,6 +28,8 @@ class Config
 
     protected ?Closure $tableArgHandler = null;
 
+    protected bool $useConstruct = false;
+
     protected static Config $instance;
 
     public static function instance(): Config
@@ -196,6 +198,18 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置是否使用构造函数
+     *
+     * @param bool $useConstruct
+     * @return $this
+     */
+    public function setUseConstruct(bool $useConstruct): Config
+    {
+        $this->useConstruct = $useConstruct;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -249,5 +263,10 @@ class Config
     public function getGenerateTrait(): bool
     {
         return $this->generateTrait;
+    }
+
+    public function getUseConstruct(): bool
+    {
+        return $this->useConstruct;
     }
 }

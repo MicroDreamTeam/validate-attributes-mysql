@@ -12,11 +12,11 @@ use SplFileInfo;
 
 class Fixer
 {
-    private array $fixers = [];
+    private array $defaultFixers = [];
 
     public function __construct()
     {
-        $this->fixers = [
+        $this->defaultFixers = [
             '@PSR2'                                      => true,
             'single_quote'                               => true, // 简单字符串应该使用单引号代替双引号；
             'no_unused_imports'                          => true, // 删除没用到的use
@@ -61,24 +61,36 @@ class Fixer
         ];
     }
 
+    private function forceApplyFixer(ConfigurationResolver $configurationResolver, Config $config): void
+    {
+        $ref       = new \ReflectionClass($configurationResolver);
+        $refConfig = $ref->getProperty('config');
+        $refConfig->setValue($configurationResolver, $config);
+    }
+
     /**
      * 格式化文件
      *
      * @param SplFileInfo $file
+     * @param bool        $force
      * @return string
      *
      * @noinspection PhpInternalEntityUsedInspection
      */
-    public function fix(SplFileInfo $file): string
+    public function fix(SplFileInfo $file, bool $force = false): string
     {
         $config = new Config();
-        $config->setRules($this->fixers)
+        $config->setRules($this->defaultFixers)
             ->setIndent("\t")
             ->setUsingCache(false);
 
         $resolver = new ConfigurationResolver($config, [
             'show-progress' => false
         ], getcwd(), new ToolInfo());
+
+        if ($force) {
+            $this->forceApplyFixer($resolver, $config);
+        }
 
         $old           = FileReader::createSingleton()->read($file->getRealPath());
         $tokens        = Tokens::fromCode($old);

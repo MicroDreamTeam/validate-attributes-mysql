@@ -18,14 +18,18 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrayItem;
+use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\PrettyPrinter\Standard;
 use SplFileInfo;
@@ -374,10 +378,10 @@ class Generator
             $rules[$column->field] = $allRules;
         }
 
-        $builder   = new BuilderFactory();
+        $builder          = new BuilderFactory();
         $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
-        $namespace = $builder->namespace($namespace_string);
-        $allClass  = array_unique($allClass);
+        $namespace        = $builder->namespace($namespace_string);
+        $allClass         = array_unique($allClass);
 
         if ($this->config->getAddFunc()
             && !$this->config->getAddFuncExtends()
@@ -406,31 +410,7 @@ class Generator
             }
         }
 
-        foreach ($rules as $key => $value) {
-            $field = $builder->property($key);
-            $type  = strtolower($this->typeMap[$columns[$key]->type]) ?? 'mixed';
-            if (!$columns[$key]->notNull && 'mixed' !== $type) {
-                $default = $this->getDefaultValue($columns[$key]->default, $type);
-                $type    = "?$type";
-                $field->setType($type);
-                $field->setDefault($default);
-            } else {
-                $field->setType($type);
-                $default = $this->getDefaultValue($columns[$key]->default, $type);
-                if (!is_null($default)) {
-                    $field->setDefault($default);
-                }
-            }
-            if ($this->config->getAddComment() && !empty($columns[$key]->comment)) {
-                $comment = $columns[$key]->comment;
-                $field->setDocComment($this->makeComment($comment));
-            }
-
-            foreach ($value as $item) {
-                $field->addAttribute($item);
-            }
-            $class->addStmt($field->getNode());
-        }
+        $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct());
 
         if ($this->config->getAddFunc()) {
             if (!$this->config->getGenerateTrait()) {
@@ -449,5 +429,80 @@ class Generator
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         return $this->getPhpCode([$ast]);
+    }
+
+    private function addFieldToClass(array $rules, Class_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false): void
+    {
+        $params = [];
+        $comments = [];
+        foreach ($rules as $key => $value) {
+            $field = $builder->property($key);
+
+            $type = strtolower($this->typeMap[$columns[$key]->type]) ?? 'mixed';
+            if (!$columns[$key]->notNull && 'mixed' !== $type) {
+                $default = $this->getDefaultValue($columns[$key]->default, $type);
+                $type    = "?$type";
+                $field->setType($type);
+                $field->setDefault($default);
+                if ($useConstruct) {
+                    $param = $builder->param($key);
+                    $param->setType($type);
+                    $param->setDefault($default);
+                    $params[$key] = [$param, true];
+                }
+            } else {
+                $field->setType($type);
+                $default = $this->getDefaultValue($columns[$key]->default, $type);
+                if ($useConstruct) {
+                    $param = $builder->param($key);
+                    $param->setType($type);
+                }
+                if (!is_null($default)) {
+                    $field->setDefault($default);
+                    if ($useConstruct) {
+                        $param->setDefault($default);
+                        $params[$key] = [$param, true];
+                    }
+                } else {
+                    if ($useConstruct) {
+                        $params[$key] = [$param, false];
+                    }
+                }
+            }
+            if ($this->config->getAddComment()) {
+                $comment = '';
+                if (!empty($columns[$key]->comment)){
+                    $comment = $columns[$key]->comment;
+                    $field->setDocComment($this->makeComment($comment));
+                }
+                if ($useConstruct) {
+                    $commentType = str_replace("?", "null|", $type);
+                    $comment = "@param $commentType \$$key $comment";
+                    $comments[] = $comment;
+                }
+            }
+
+            foreach ($value as $item) {
+                $field->addAttribute($item);
+            }
+            $class->addStmt($field->getNode());
+        }
+
+        if ($useConstruct) {
+            $method = $builder->method('__construct');
+            uasort($params, function ($a, $b) {
+                return $a[1] <=> $b[1];
+            });
+            array_map(fn ($param) => $method->addParam($param[0]), $params);
+            foreach ($params as $key => $param) {
+                $method->addStmt(new Expression(new Assign(new PropertyFetch(new Variable('this'), $key), new Variable($key))));
+            }
+
+            if ($this->config->getAddComment()){
+                $comment = $this->makeComment(implode("\n", $comments));
+                $method->setDocComment($comment);
+            }
+            $class->addStmt($method->getNode());
+        }
     }
 }
