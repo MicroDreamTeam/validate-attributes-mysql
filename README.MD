@@ -119,7 +119,7 @@ namespace {
         #[MysqlTinyint(true)]
         #[Numeric]
         #[Nullable]
-        #[Preprocessor('18', ProcessorExecCond::WHEN_EMPTY)]
+        #[Preprocessor(18, ProcessorExecCond::WHEN_EMPTY)]
         public ?int $age = 18;
 
         public function toArray(): array

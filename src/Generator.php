@@ -24,7 +24,6 @@ use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
@@ -200,7 +199,7 @@ class Generator
             } else {
                 $rules[] = [
                     Preprocessor::class,
-                    $column->default,
+                    $this->getDefaultValue($column->default, $type),
                     ProcessorExecCond::WHEN_EMPTY
                 ];
             }
@@ -266,11 +265,11 @@ class Generator
             return null;
         }
 
-        if ('int' === $type) {
+        if (in_array($type, $this->numeric)) {
             return (int)$default;
         } elseif ('string' === $type) {
             return (string)$default;
-        } elseif ('float' === $type) {
+        } elseif (in_array($type, $this->precision)) {
             return (float)$default;
         } elseif ('array' === $type) {
             return explode(',', $default);
@@ -433,7 +432,7 @@ class Generator
 
     private function addFieldToClass(array $rules, Class_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false): void
     {
-        $params = [];
+        $params   = [];
         $comments = [];
         foreach ($rules as $key => $value) {
             $field = $builder->property($key);
@@ -471,14 +470,14 @@ class Generator
             }
             if ($this->config->getAddComment()) {
                 $comment = '';
-                if (!empty($columns[$key]->comment)){
+                if (!empty($columns[$key]->comment)) {
                     $comment = $columns[$key]->comment;
                     $field->setDocComment($this->makeComment($comment));
                 }
                 if ($useConstruct) {
-                    $commentType = str_replace("?", "null|", $type);
-                    $comment = "@param $commentType \$$key $comment";
-                    $comments[] = $comment;
+                    $commentType = str_replace('?', 'null|', $type);
+                    $comment     = "@param $commentType \$$key $comment";
+                    $comments[]  = $comment;
                 }
             }
 
@@ -498,7 +497,7 @@ class Generator
                 $method->addStmt(new Expression(new Assign(new PropertyFetch(new Variable('this'), $key), new Variable($key))));
             }
 
-            if ($this->config->getAddComment()){
+            if ($this->config->getAddComment()) {
                 $comment = $this->makeComment(implode("\n", $comments));
                 $method->setDocComment($comment);
             }
