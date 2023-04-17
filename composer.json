@@ -26,7 +26,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Itwmw\\Validate\\Attributes\\Mysql\\Providers\\ValidateProvider.php"
+                "Itwmw\\Validate\\Attributes\\Mysql\\Providers\\ValidateProvider"
             ]
         }
     },
