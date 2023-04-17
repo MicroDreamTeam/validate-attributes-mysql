@@ -394,9 +394,9 @@ class Generator
         }
 
         if ($this->config->getGenerateTrait()) {
-            $class = $builder->trait(is_null($class_name) ? $table : $class_name);
+            $class = $builder->trait(is_null($class_name) ? ucfirst($table) : $class_name);
         } else {
-            $class = $builder->class(is_null($class_name) ? $table : $class_name);
+            $class = $builder->class(is_null($class_name) ? ucfirst($table) : $class_name);
         }
 
         if ($this->config->getAddComment()) {
