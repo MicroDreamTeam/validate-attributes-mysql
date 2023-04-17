@@ -23,6 +23,13 @@
         "friendsofphp/php-cs-fixer": "^3.16",
         "symfony/console": ">=5.2"
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Itwmw\\Validate\\Attributes\\Mysql\\Providers\\ValidateProvider.php"
+            ]
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true
 }
