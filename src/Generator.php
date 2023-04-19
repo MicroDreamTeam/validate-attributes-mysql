@@ -134,6 +134,134 @@ class Generator
         $this->mysql = new Mysql($this->connection);
     }
 
+    public function makeDataClass(string $table, string $namespace_string = null, string $class_name = null): string
+    {
+        $columns = $this->getTableColumns($table);
+        if (empty($columns)) {
+            throw new \RuntimeException("Table {$table} not found");
+        }
+        $rules    = [];
+        $allClass = [];
+
+        foreach ($columns as $column) {
+            $rules[$column->field] = $this->makeValidateRule($column);
+            $allRules              = [];
+            foreach ($rules[$column->field] as $rule) {
+                $this->makeAst($allClass, $allRules, $rule);
+            }
+            $rules[$column->field] = $allRules;
+        }
+
+        $builder          = new BuilderFactory();
+        $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
+        $namespace        = $builder->namespace($namespace_string);
+        $allClass         = array_unique($allClass);
+
+        if ($this->config->getAddFunc()
+            && !$this->config->getAddFuncExtends()
+            && !empty($namespace_string)
+        ) {
+            $allClass[] = \Stringable::class;
+        }
+        if ($namespace_string !== $this->config->getNamespacePrefix()) {
+            $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
+        }
+
+        foreach ($allClass as $class) {
+            $namespace->addStmt($builder->use($class)->getNode());
+        }
+
+        if ($this->config->getGenerateTrait()) {
+            $class = $builder->trait(is_null($class_name) ? ucfirst($table) : $class_name);
+        } else {
+            $class = $builder->class(is_null($class_name) ? ucfirst($table) : $class_name);
+        }
+
+        if ($this->config->getAddComment()) {
+            $tableComment = $this->mysql->getTableComment($table);
+            if (!empty($tableComment)) {
+                $class->setDocComment($this->makeComment($tableComment));
+            }
+        }
+
+        $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct());
+
+        if ($this->config->getAddFunc()) {
+            if (!$this->config->getGenerateTrait()) {
+                if ($this->config->getAddFuncExtends()) {
+                    $this->makeBaseDataClass();
+                    $class->extend('BaseData');
+                } else {
+                    $class->implement(\Stringable::class);
+                    $this->addToStringFunc($class, $builder);
+                }
+            } else {
+                $this->addToStringFunc($class, $builder);
+            }
+
+            $this->addToArrayFunc($class, $builder, array_keys($rules));
+        }
+
+        $namespace->addStmt($class);
+        $ast = $namespace->getNode();
+        $php = $this->getPhpCode([$ast]);
+        if ($this->config->getAddFunc()) {
+            $fixToArrayFunc = new FixToArrayFunc($php);
+            $php            = $fixToArrayFunc->fix();
+        }
+        return $this->fixPhpCode($php);
+    }
+
+    protected function paramsToAst(mixed $value): DNumber|ConstFetch|LNumber|String_|Array_
+    {
+        if (is_string($value)) {
+            return new String_($value);
+        } elseif (is_int($value)) {
+            return new LNumber($value);
+        } elseif (is_float($value)) {
+            return new DNumber($value);
+        } elseif (is_bool($value)) {
+            return new ConstFetch(new Name($value ? 'true' : 'false'));
+        } elseif (is_array($value)) {
+            $items = [];
+            foreach ($value as $item) {
+                $items[] = new ArrayItem($this->paramsToAst($item));
+            }
+            return new Array_($items);
+        } elseif (is_null($value)) {
+            return new ConstFetch(new Name('null'));
+        }
+        throw new \Exception('暂不支持该类型');
+    }
+
+    protected function makeAst(array &$allClass, array &$allRules, mixed $rule): void
+    {
+        if (is_subclass_of($rule, RuleInterface::class)) {
+            $allClass[] = $rule;
+            $allRules[] = new Attribute(new Name(basename($rule)));
+        } elseif (is_array($rule)) {
+            $class      = $rule[0];
+            $args       = [];
+            $allClass[] = $class;
+            if (is_subclass_of($class, RuleInterface::class)) {
+                foreach (array_slice($rule, 1) as $arg) {
+                    $args[] = $this->paramsToAst($arg);
+                }
+                $allRules[] = new Attribute(new Name(basename($class)), $args);
+            } elseif (is_a($class, Preprocessor::class) || Preprocessor::class === $class) {
+                foreach (array_slice($rule, 1) as $arg) {
+                    if ($arg instanceof ProcessorSupport) {
+                        $allClass[] = get_class($arg);
+                        $args[]     = new ClassConstFetch(new Name(basename(get_class($arg))), $arg->name);
+                    } else {
+                        $args[] = $this->paramsToAst($arg);
+                    }
+                }
+                $allRules[] = new Attribute(new Name(basename($class)), $args);
+            }
+        }
+    }
+
     /**
      * @param string $table
      * @return Column[]
@@ -209,56 +337,6 @@ class Generator
         return $rules;
     }
 
-    protected function paramsToAst(mixed $value): DNumber|ConstFetch|LNumber|String_|Array_
-    {
-        if (is_string($value)) {
-            return new String_($value);
-        } elseif (is_int($value)) {
-            return new LNumber($value);
-        } elseif (is_float($value)) {
-            return new DNumber($value);
-        } elseif (is_bool($value)) {
-            return new ConstFetch(new Name($value ? 'true' : 'false'));
-        } elseif (is_array($value)) {
-            $items = [];
-            foreach ($value as $item) {
-                $items[] = new ArrayItem($this->paramsToAst($item));
-            }
-            return new Array_($items);
-        } elseif (is_null($value)) {
-            return new ConstFetch(new Name('null'));
-        }
-        throw new \Exception('暂不支持该类型');
-    }
-
-    protected function makeAst(array &$allClass, array &$allRules, mixed $rule): void
-    {
-        if (is_subclass_of($rule, RuleInterface::class)) {
-            $allClass[] = $rule;
-            $allRules[] = new Attribute(new Name(basename($rule)));
-        } elseif (is_array($rule)) {
-            $class      = $rule[0];
-            $args       = [];
-            $allClass[] = $class;
-            if (is_subclass_of($class, RuleInterface::class)) {
-                foreach (array_slice($rule, 1) as $arg) {
-                    $args[] = $this->paramsToAst($arg);
-                }
-                $allRules[] = new Attribute(new Name(basename($class)), $args);
-            } elseif (is_a($class, Preprocessor::class) || Preprocessor::class === $class) {
-                foreach (array_slice($rule, 1) as $arg) {
-                    if ($arg instanceof ProcessorSupport) {
-                        $allClass[] = get_class($arg);
-                        $args[]     = new ClassConstFetch(new Name(basename(get_class($arg))), $arg->name);
-                    } else {
-                        $args[] = $this->paramsToAst($arg);
-                    }
-                }
-                $allRules[] = new Attribute(new Name(basename($class)), $args);
-            }
-        }
-    }
-
     private function getDefaultValue(mixed $default, string $type)
     {
         if (is_null($default)) {
@@ -278,41 +356,26 @@ class Generator
         return $default;
     }
 
-    private function addDataFunc(Trait_|Class_ $class)
-    {
-        $builder     = new BuilderFactory();
-        $toArrayFunc = $builder->method('toArray');
-        $toArrayFunc->makePublic();
-        $toArrayFunc->setReturnType('array');
-        $toArrayFunc->addStmt(new Return_(
-            new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
-        ));
-        $class->addStmt($toArrayFunc->getNode());
-
-        $toStringFunc = $builder->method('__toString');
-        $toStringFunc->makePublic();
-        $toStringFunc->setReturnType('string');
-        $toStringFunc->addStmt(new Return_(
-            new FuncCall(new Name('json_encode'), [
-                new Arg(new FuncCall(new Name('$this->toArray'))),
-                new Arg(new ConstFetch(new Name('JSON_UNESCAPED_UNICODE')))
-            ])
-        ));
-        $class->addStmt($toStringFunc->getNode());
-    }
-
     private function getPhpCode(array $ast): string
     {
         $prettyPrinter = new Standard([
-            'shortArraySyntax'        => true,
-            'singleQuote'             => true,
-            'nullableTypeDeclaration' => true
+            'shortArraySyntax' => true
         ]);
 
-        $php     = $prettyPrinter->prettyPrintFile($ast);
+        return $prettyPrinter->prettyPrintFile($ast);
+    }
+
+    private function fixPhpCode(string $php): string
+    {
+        $fix = new Fixer();
+        // 使用内置规则先强制修复一次
         $tmpFile = tempnam(sys_get_temp_dir(), 'php');
         file_put_contents($tmpFile, $php);
-        $fix = new Fixer();
+        $php = $fix->fix(new SplFileInfo($tmpFile), true);
+        @unlink($tmpFile);
+        // 使用用户的规则再修复一次
+        $tmpFile = tempnam(sys_get_temp_dir(), 'php');
+        file_put_contents($tmpFile, $php);
         $php = $fix->fix(new SplFileInfo($tmpFile));
         @unlink($tmpFile);
         return $php;
@@ -340,10 +403,11 @@ class Generator
             $namespace->addStmt($builder->use(\Stringable::class)->getNode());
         }
         $class = $builder->class('BaseData')->implement(\Stringable::class);
-        $this->addDataFunc($class);
+        $this->addToStringFunc($class, $builder);
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
+        $php = $this->fixPhpCode($php);
         file_put_contents($baseDataPhpPath, $php);
     }
 
@@ -359,78 +423,7 @@ class Generator
         return "/**\n * {$comment}\n */";
     }
 
-    public function makeDataClass(string $table, string $namespace_string = null, string $class_name = null): string
-    {
-        $columns = $this->getTableColumns($table);
-        if (empty($columns)) {
-            throw new \RuntimeException("Table {$table} not found");
-        }
-        $rules    = [];
-        $allClass = [];
-
-        foreach ($columns as $column) {
-            $rules[$column->field] = $this->makeValidateRule($column);
-            $allRules              = [];
-            foreach ($rules[$column->field] as $rule) {
-                $this->makeAst($allClass, $allRules, $rule);
-            }
-            $rules[$column->field] = $allRules;
-        }
-
-        $builder          = new BuilderFactory();
-        $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
-        $namespace        = $builder->namespace($namespace_string);
-        $allClass         = array_unique($allClass);
-
-        if ($this->config->getAddFunc()
-            && !$this->config->getAddFuncExtends()
-            && !empty($namespace_string)
-        ) {
-            $allClass[] = \Stringable::class;
-        }
-        if ($namespace_string !== $this->config->getNamespacePrefix()) {
-            $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
-        }
-
-        foreach ($allClass as $class) {
-            $namespace->addStmt($builder->use($class)->getNode());
-        }
-
-        if ($this->config->getGenerateTrait()) {
-            $class = $builder->trait(is_null($class_name) ? ucfirst($table) : $class_name);
-        } else {
-            $class = $builder->class(is_null($class_name) ? ucfirst($table) : $class_name);
-        }
-
-        if ($this->config->getAddComment()) {
-            $tableComment = $this->mysql->getTableComment($table);
-            if (!empty($tableComment)) {
-                $class->setDocComment($this->makeComment($tableComment));
-            }
-        }
-
-        $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct());
-
-        if ($this->config->getAddFunc()) {
-            if (!$this->config->getGenerateTrait()) {
-                if ($this->config->getAddFuncExtends()) {
-                    $this->makeBaseDataClass();
-                    $class->extend('BaseData');
-                } else {
-                    $class->implement(\Stringable::class);
-                    $this->addDataFunc($class);
-                }
-            } else {
-                $this->addDataFunc($class);
-            }
-        }
-
-        $namespace->addStmt($class);
-        $ast = $namespace->getNode();
-        return $this->getPhpCode([$ast]);
-    }
-
-    private function addFieldToClass(array $rules, Class_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false): void
+    private function addFieldToClass(array $rules, Class_|Trait_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false): void
     {
         $params   = [];
         $comments = [];
@@ -510,6 +503,33 @@ class Generator
             }
             $class->addStmt($method->getNode());
         }
+    }
+
+    private function addToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder, array $fields): void
+    {
+        $method = $builder->method('toArray');
+        $method->makePublic();
+        $method->setReturnType('array');
+        $array = new Array_();
+        foreach ($fields as $field) {
+            $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
+        }
+        $method->addStmt(new Return_($array));
+        $class->addStmt($method->getNode());
+    }
+
+    private function addToStringFunc(Trait_|Class_ $class, BuilderFactory $builder): void
+    {
+        $toStringFunc = $builder->method('__toString');
+        $toStringFunc->makePublic();
+        $toStringFunc->setReturnType('string');
+        $toStringFunc->addStmt(new Return_(
+            new FuncCall(new Name('json_encode'), [
+                new Arg(new FuncCall(new Name('$this->toArray'))),
+                new Arg(new ConstFetch(new Name('JSON_UNESCAPED_UNICODE')))
+            ])
+        ));
+        $class->addStmt($toStringFunc->getNode());
     }
 
     private function getDefaultForType(string $type): mixed
