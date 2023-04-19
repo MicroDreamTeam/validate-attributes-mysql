@@ -404,6 +404,7 @@ class Generator
         }
         $class = $builder->class('BaseData')->implement(\Stringable::class);
         $this->addToStringFunc($class, $builder);
+        $this->addBaseToArrayFunc($class, $builder);
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
@@ -516,6 +517,17 @@ class Generator
         }
         $method->addStmt(new Return_($array));
         $class->addStmt($method->getNode());
+    }
+
+    private function addBaseToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder): void
+    {
+        $toArrayFunc = $builder->method('toArray');
+        $toArrayFunc->makePublic();
+        $toArrayFunc->setReturnType('array');
+        $toArrayFunc->addStmt(new Return_(
+            new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
+        ));
+        $class->addStmt($toArrayFunc->getNode());
     }
 
     private function addToStringFunc(Trait_|Class_ $class, BuilderFactory $builder): void
