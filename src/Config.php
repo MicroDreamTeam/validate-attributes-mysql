@@ -3,9 +3,16 @@
 namespace Itwmw\Validate\Attributes\Mysql;
 
 use Closure;
+use JetBrains\PhpStorm\ExpectedValues;
 
 class Config
 {
+    public const PROPERTY_SCOPE_PUBLIC = 'public';
+
+    public const PROPERTY_SCOPE_PROTECTED = 'protected';
+
+    public const PROPERTY_SCOPE_PRIVATE = 'private';
+
     protected ?string $namespacePrefix = null;
 
     protected bool $addFunc = true;
@@ -31,6 +38,10 @@ class Config
     protected bool $useConstruct = false;
 
     protected bool $constructAllOptional = false;
+
+    protected string $propertyScope = 'public';
+
+    protected bool $propertyReadOnly = false;
 
     protected static Config $instance;
 
@@ -224,6 +235,32 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置属性作用域
+     *
+     * @param string $propertyScope
+     * @return $this
+     */
+    public function setPropertyScope(
+        #[ExpectedValues(valuesFromClass: Config::class)]
+        string $propertyScope
+    ): Config {
+        $this->propertyScope = $propertyScope;
+        return $this;
+    }
+
+    /**
+     * 设置属性是否只读
+     *
+     * @param bool $propertyReadOnly
+     * @return $this
+     */
+    public function setPropertyReadOnly(bool $propertyReadOnly): Config
+    {
+        $this->propertyReadOnly = $propertyReadOnly;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -287,5 +324,15 @@ class Config
     public function getConstructAllOptional(): bool
     {
         return $this->constructAllOptional;
+    }
+
+    public function getPropertyScope(): string
+    {
+        return $this->propertyScope;
+    }
+
+    public function getPropertyReadOnly(): bool
+    {
+        return $this->propertyReadOnly;
     }
 }

@@ -428,15 +428,22 @@ class Generator
     {
         $params   = [];
         $comments = [];
+        $propertyScope = "make".ucfirst($this->config->getPropertyScope());
+        $propertyReadOnly = $this->config->getPropertyReadOnly();
         foreach ($rules as $key => $value) {
             $field = $builder->property($key);
-
+            $field->$propertyScope();
+            if ($propertyReadOnly){
+                $field->makeReadonly();
+            }
             $type = strtolower($this->typeMap[$columns[$key]->type]) ?? 'mixed';
             if (!$columns[$key]->notNull && 'mixed' !== $type) {
                 $default = $this->getDefaultValue($columns[$key]->default, $type);
                 $type    = "?$type";
                 $field->setType($type);
-                $field->setDefault($default);
+                if (!$propertyReadOnly){
+                    $field->setDefault($default);
+                }
                 if ($useConstruct) {
                     $param = $builder->param($key);
                     $param->setType($type);
@@ -451,7 +458,9 @@ class Generator
                     $param->setType($type);
                 }
                 if (!is_null($default)) {
-                    $field->setDefault($default);
+                    if (!$propertyReadOnly){
+                        $field->setDefault($default);
+                    }
                     if ($useConstruct) {
                         $param->setDefault($default);
                         $params[$key] = [$param, true];
