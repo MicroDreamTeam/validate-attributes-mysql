@@ -44,6 +44,11 @@ class GenerateBaseClass
     {
         $configInfo = $this->getClassUid();
         $class      = $this->config->getNamespacePrefix() . '\\' . 'BaseDataTrait';
+        $path       = $this->getFilePath('BaseDataTrait');
+        if (!file_exists($path)) {
+            return true;
+        }
+
         return !property_exists($class, '__' . $configInfo . '__');
     }
 
@@ -56,7 +61,7 @@ class GenerateBaseClass
         $namespace = $builder->namespace($this->config->getNamespacePrefix());
         $namespace->addStmt($builder->use(Str::class)->getNode());
 
-        $class     = $builder->trait('BaseDataTrait');
+        $class = $builder->trait('BaseDataTrait');
         $class->addStmt($builder->property('__' . $configInfo . '__')->setType('int')->makePrivate()->getNode());
         $methodGenerator = new GenerateFunc($this->config, $class);
         $methodGenerator->addBaseToArrayFunc();
