@@ -38,16 +38,22 @@ Config::instance()->setMysqlConnection($database);
 #### 以下为`Config`可选配置：
 - `setBasePath` 配置生成数据类的基础路径 
 - `setNamespacePrefix` 配置生成数据类的命名空间前缀 
+- `setBaseNamespace` 配置生成数据类的基础命名空间，此命名空间应与`basePath`对应
 - `setAddFunc` 是否添加基础方法 
 - `setAddFuncExtends` 添加基础方法的方式, `true` 为通过继承的方式添加， `false` 为直接在当前类下添加方法
 - `setAddComment` 是否添加注释，注释来源为 `Mysql` 中的注释
 - `setSplitTableName` 是否分割表名，如 `user_info` 会处理为，命名空间： `$NamespacePrefix\User` , 类名： `Info`
 - `setRemoveTablePrefix` 生成的数据类要移除的表前缀，如： `t_`
 - `setTypeMap` 字段类型映射，可自定义字段类型映射，如： `['json' => 'array']`
-- `setGenerateTrait` 是否生成 `Trait` ，启用后会生成 `trait` 文件,否则生成类文件，**当使用 `trait` 时, `addFuncExtends` 设置无效**
+- `setGenerateTrait` 是否生成 `Trait` ，启用后会生成 `trait` 文件,否则生成类文件
 - `setUseConstruct` 是否使用构造函数，启用后会在类中添加构造函数
 - `setConstructAllOptional` 构造函数是否全部可选，启用后，构造函数中的参数全部可选,仅当 `useConstruct` 为 `true` 时有效
 - `setTableArgHandler` 表名处理函数，可自定义表名处理方式，如：`function ($tableName) { return 't_' . $tableName; }`
+- `setPropertyScope` 属性作用域，可自定义属性作用域，如：`private`,默认为 `public`
+- `setPropertyReadOnly` 属性是否只读，启用后，属性类型会添加 `readonly` 关键字
+- `setGenerateSetter` 是否生成修改器，启用后，会生成修改器，如：`setName`，`setAge`
+- `setGenerateGetter` 是否生成访问器，启用后，会生成访问器，如：`getName`，`getAge`
+- `setWritePropertyValidate` 是否启用写入数据时验证数据，启用后，当使用修改器，会自动验证数据
 
 以下为`Laravel` Model 文件转表名的示例：
 ```php
