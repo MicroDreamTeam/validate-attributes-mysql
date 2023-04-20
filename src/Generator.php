@@ -131,11 +131,25 @@ class Generator
 
     public function __construct(Config $config = null)
     {
-        $this->config     = $config ?? Config::instance();
+        $this->config = $config ?? Config::instance();
+        $this->checkConfig();
         $this->typeMap    = array_merge($this->typeMap, $this->config->getTypeMap());
         $this->connection = new MysqlConnection();
         $this->connection->setConnection($config->getMysqlConnection());
         $this->mysql = new Mysql($this->connection);
+    }
+
+    private function checkConfig(): void
+    {
+        if ($this->config->getGenerateSetter() || $this->config->getGenerateTrait()) {
+            if ($this->config->getAddFuncExtends() && Config::PROPERTY_SCOPE_PRIVATE === $this->config->getPropertyScope()) {
+                throw new \RuntimeException('当使用继承来扩展方法时，获取器和修改器无法访问私有属性');
+            }
+        }
+
+        if ($this->config->getGenerateSetter() && $this->config->getPropertyReadOnly()) {
+            throw new \RuntimeException('当属性为只读类型时，无法使用修改器');
+        }
     }
 
     public function makeDataClass(string $table, string $namespace_string = null, string $class_name = null): string
