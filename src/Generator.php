@@ -675,7 +675,7 @@ class Generator
             'stmts' => $callSubFunc
         ]);
 
-        $stmts[] = new Expression(new StaticCall(new Name('parent'), new Identifier('__call'), [
+        $stmts[] = new Return_(new StaticCall(new Name('parent'), new Identifier('__call'), [
             new Arg(new Variable('name')),
             new Arg(new Variable('arguments'))
         ]));
