@@ -14,31 +14,23 @@ use Itwmw\Validate\Attributes\Rules\RuleInterface;
 use PhpParser\Builder\Class_;
 use PhpParser\Builder\Trait_;
 use PhpParser\BuilderFactory;
-use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\Array_;
-use PhpParser\Node\Expr\ArrayDimFetch;
 use PhpParser\Node\Expr\ArrayItem;
 use PhpParser\Node\Expr\Assign;
-use PhpParser\Node\Expr\BinaryOp\Equal;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
-use PhpParser\Node\Expr\FuncCall;
-use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
-use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Expression;
-use PhpParser\Node\Stmt\Foreach_;
-use PhpParser\Node\Stmt\If_;
-use PhpParser\Node\Stmt\Return_;
 use PhpParser\PrettyPrinter\Standard;
+use RuntimeException;
 use SplFileInfo;
+use Stringable;
 use W7\Validate\Support\Processor\ProcessorExecCond;
 use W7\Validate\Support\Processor\ProcessorSupport;
 
@@ -149,12 +141,12 @@ class Generator
     {
         if ($this->config->getGenerateSetter() || $this->config->getGenerateTrait()) {
             if ($this->config->getAddFuncExtends() && Config::PROPERTY_SCOPE_PRIVATE === $this->config->getPropertyScope()) {
-                throw new \RuntimeException('当使用继承来扩展方法时，获取器和修改器无法访问私有属性');
+                throw new RuntimeException('当使用继承来扩展方法时，获取器和修改器无法访问私有属性');
             }
         }
 
         if ($this->config->getGenerateSetter() && $this->config->getPropertyReadOnly()) {
-            throw new \RuntimeException('当属性为只读类型时，无法使用修改器');
+            throw new RuntimeException('当属性为只读类型时，无法使用修改器');
         }
     }
 
@@ -162,7 +154,7 @@ class Generator
     {
         $columns = $this->getTableColumns($table);
         if (empty($columns)) {
-            throw new \RuntimeException("Table {$table} not found");
+            throw new RuntimeException("Table {$table} not found");
         }
         $rules         = [];
         $allClass      = [];
@@ -188,7 +180,7 @@ class Generator
             && !$this->config->getGenerateTrait()
             && !empty($namespace_string)
         ) {
-            $allClass[] = \Stringable::class;
+            $allClass[] = Stringable::class;
         }
 
         if ($namespace_string !== $this->config->getNamespacePrefix() && $this->config->getAddFuncExtends()) {
@@ -210,6 +202,7 @@ class Generator
         }
 
         $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct(), $methodComment);
+        $methodGenerator = new GenerateFunc($this->config, $class);
 
         if ($this->config->getAddFunc()) {
             if (!$this->config->getGenerateTrait()) {
@@ -217,23 +210,23 @@ class Generator
                     $this->makeBaseDataClass();
                     $class->extend('BaseData');
                 } else {
-                    $class->implement(\Stringable::class);
-                    $this->addToStringFunc($class, $builder);
-                    $this->addCallFunc($class, $builder);
+                    $class->implement(Stringable::class);
+                    $methodGenerator->addToStringFunc();
+                    $methodGenerator->addCallFunc();
                 }
             } else {
                 if ($this->config->getAddFuncExtends()) {
                     $this->makeBaseDataClass();
                     $class->addStmt($builder->useTrait('BaseDataTrait'));
                 } else {
-                    $this->addToStringFunc($class, $builder);
-                    $this->addCallFunc($class, $builder);
-                    $this->addCreateFunc($class, $builder);
+                    $methodGenerator->addToStringFunc();
+                    $methodGenerator->addCallFunc();
+                    $methodGenerator->addCreateFunc();
                 }
 
             }
 
-            $this->addToArrayFunc($class, $builder, $fields);
+            $methodGenerator->addToArrayFunc($fields);
         }
         if ($this->config->getAddComment()) {
             $tableComment = $this->mysql->getTableComment($table);
@@ -399,7 +392,7 @@ class Generator
         return $default;
     }
 
-    public function getPhpCode(array $ast): string
+    public static function getPhpCode(array $ast): string
     {
         $prettyPrinter = new Standard([
             'shortArraySyntax' => true
@@ -408,7 +401,7 @@ class Generator
         return $prettyPrinter->prettyPrintFile($ast);
     }
 
-    public function fixPhpCode(string $php): string
+    public static function fixPhpCode(string $php): string
     {
         $fix = new Fixer();
         // 使用内置规则先强制修复一次
@@ -426,7 +419,7 @@ class Generator
 
     private function makeBaseDataClass(): void
     {
-        $baseGenerator = new GenerateBaseClass($this->config, $this);
+        $baseGenerator = new GenerateBaseClass($this->config);
         if (!$baseGenerator->checkClassNeedUpdate()) {
             return;
         }
@@ -553,172 +546,6 @@ class Generator
             }
             $class->addStmt($method->getNode());
         }
-    }
-
-    private function addToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder, array $fields): void
-    {
-        $method = $builder->method('toArray');
-        $method->makePublic();
-        $method->setReturnType('array');
-        $array = new Array_();
-        foreach ($fields as $field) {
-            $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
-        }
-        $method->addStmt(new Return_($array));
-        $class->addStmt($method->getNode());
-    }
-
-    public function addBaseToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder): void
-    {
-        $toArrayFunc = $builder->method('toArray');
-        $toArrayFunc->makePublic();
-        $toArrayFunc->setReturnType('array');
-        $toArrayFunc->addStmt(new Return_(
-            new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
-        ));
-        $class->addStmt($toArrayFunc->getNode());
-    }
-
-    public function addToStringFunc(Trait_|Class_ $class, BuilderFactory $builder): void
-    {
-        $toStringFunc = $builder->method('__toString');
-        $toStringFunc->makePublic();
-        $toStringFunc->setReturnType('string');
-        $toStringFunc->addStmt(new Return_(
-            new FuncCall(new Name('json_encode'), [
-                new Arg(new FuncCall(new Name('$this->toArray'))),
-                new Arg(new ConstFetch(new Name('JSON_UNESCAPED_UNICODE')))
-            ])
-        ));
-        $class->addStmt($toStringFunc->getNode());
-    }
-
-    public function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder, bool $force = false): void
-    {
-        if (false === $force && !$this->config->getGenerateGetter()) {
-            if (!$this->config->getGenerateSetter() || $this->config->getPropertyReadOnly()) {
-                return;
-            }
-        }
-
-        $callFunc = $builder->method('__call');
-        $callFunc->makePublic();
-        $callFunc->addParam($builder->param('name'));
-        $callFunc->addParam($builder->param('arguments'));
-        $stmts  = [];
-        $prefix = new FuncCall(new Name('substr'), [
-            new Arg(new Variable('name')),
-            new Arg(new LNumber(0)),
-            new Arg(new LNumber(3))
-        ]);
-        $stmts[]  = new Expression(new Assign(new Variable('prefix'), $prefix));
-        $property = new FuncCall(new Name('lcfirst'), [
-            new Arg(new FuncCall(new Name('substr'), [
-                new Arg(new Variable('name')),
-                new Arg(new LNumber(3))
-            ]))
-        ]);
-        $stmts[]          = new Expression(new Assign(new Variable('property'), $property));
-        $ifPropertyExists = new FuncCall(new Name('property_exists'), [
-            new Arg(new Variable('this')),
-            new Arg(new Variable('property'))
-        ]);
-        $getter = new If_(new Equal(left: new Variable('prefix'), right: new String_('get')), [
-            'stmts' => [
-                new Return_(new PropertyFetch(new Variable('this'), new Variable('property')))
-            ]
-        ]);
-
-        if ($this->config->getWritePropertyValidate()) {
-            $setterExpression = [
-                new Expression(new Assign(new Variable('data'), new FuncCall(new Name('validate_attribute'), [
-                    new Arg(new ClassConstFetch(class:new Name(['static']), name: new Identifier('class'))),
-                    new Arg(value: new Array_([
-                        new ArrayItem(value: new ArrayDimFetch(new Variable('arguments'), new LNumber(0)), key: new Variable('property')),
-                    ])),
-                    new Arg(value: new Array_([
-                        new ArrayItem(value: new Variable('property')),
-                    ])),
-                ]))),
-                new Expression(new Assign(
-                    new PropertyFetch(new Variable('this'), new Variable('property')),
-                    new PropertyFetch(new Variable('data'), new Variable('property'))
-                )),
-            ];
-        } else {
-            $setterExpression = [
-                new Expression(
-                    new Assign(
-                        new PropertyFetch(new Variable('this'), new Variable('property')),
-                        new ArrayDimFetch(new Variable('arguments'), new LNumber(0))
-                    )
-                )
-            ];
-        }
-
-        $setter = new If_(new Equal(left: new Variable('prefix'), right: new String_('set')), [
-            'stmts' => [
-                ...$setterExpression,
-                new Return_(new Variable('this'))
-            ]
-        ]);
-        $callSubFunc = [];
-        if (!$this->config->getPropertyReadOnly() && $this->config->getGenerateSetter() || $force) {
-            $callSubFunc[] = $setter;
-        }
-
-        if ($this->config->getGenerateGetter() || $force) {
-            $callSubFunc[] = $getter;
-        }
-
-        $stmts[] = new If_(cond: $ifPropertyExists, subNodes:[
-            'stmts' => $callSubFunc
-        ]);
-
-        $stmts[] = new Return_(new StaticCall(new Name('parent'), new Identifier('__call'), [
-            new Arg(new Variable('name')),
-            new Arg(new Variable('arguments'))
-        ]));
-
-        $callFunc->addStmts($stmts);
-        $class->addStmt($callFunc->getNode());
-    }
-
-    public function addCreateFunc(Trait_|Class_ $class, BuilderFactory $builder): void
-    {
-        $createFunc = $builder->method('create');
-        $createFunc->makePublic()->makeStatic();
-        $createFunc->setReturnType('static');
-
-        $createFunc->addParam($builder->param('data')->setType('array'));
-
-        $_class  = new Expression(new Assign(new Variable('class'), new New_(new Name('static'))));
-        $foreach = new Foreach_(new Variable('data'), new Variable('value'), [
-            'keyVar' => new Variable('key'),
-            'stmts'  => [
-                new If_(new FuncCall(new Name('property_exists'), [
-                    new Arg(new Variable('class')),
-                    new Arg(new Variable('key'))
-                ]), [
-                    'stmts' => [
-                        new Expression(
-                            new Assign(
-                                new PropertyFetch(
-                                    new Variable('class'),
-                                    new Variable('key')
-                                ),
-                                new Variable('value')
-                            )
-                        )
-                    ]
-                ])
-            ]
-        ]);
-
-        $return = new Return_(new Variable('class'));
-
-        $createFunc->addStmts([$_class, $foreach, $return]);
-        $class->addStmt($createFunc->getNode());
     }
 
     private function getDefaultForType(string $type): mixed

@@ -10,7 +10,7 @@ use PhpParser\BuilderFactory;
  */
 class GenerateBaseClass
 {
-    public function __construct(protected Config $config, protected Generator $generator)
+    public function __construct(protected Config $config)
     {
     }
 
@@ -55,14 +55,15 @@ class GenerateBaseClass
         $namespace = $builder->namespace($this->config->getNamespacePrefix());
         $class     = $builder->trait('BaseDataTrait');
         $class->addStmt($builder->property('__' . $configInfo . '__')->setType('int')->makePrivate()->getNode());
-        $this->generator->addToStringFunc($class, $builder);
-        $this->generator->addBaseToArrayFunc($class, $builder);
-        $this->generator->addCallFunc($class, $builder, true);
-        $this->generator->addCreateFunc($class, $builder);
+        $methodGenerator = new GenerateFunc($this->config, $class);
+        $methodGenerator->addToStringFunc();
+        $methodGenerator->addBaseToArrayFunc();
+        $methodGenerator->addCallFunc(true);
+        $methodGenerator->addCreateFunc();
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
-        $php = $this->generator->getPhpCode([$ast]);
-        $php = $this->generator->fixPhpCode($php);
+        $php = Generator::getPhpCode([$ast]);
+        $php = Generator::fixPhpCode($php);
         file_put_contents($path, $php);
     }
 
@@ -79,8 +80,8 @@ class GenerateBaseClass
         $class->addStmt(new TraitUse('BaseDataTrait'));
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
-        $php = $this->generator->getPhpCode([$ast]);
-        $php = $this->generator->fixPhpCode($php);
+        $php = Generator::getPhpCode([$ast]);
+        $php = Generator::fixPhpCode($php);
         file_put_contents($path, $php);
     }
 }
