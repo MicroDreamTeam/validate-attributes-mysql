@@ -17,13 +17,13 @@ class Config
 
     protected ?string $baseNamespace = null;
 
-    protected bool $addFunc = true;
+    protected bool $addFunc = false;
 
     protected bool $addFuncExtends = false;
 
     protected bool $splitTableName = false;
 
-    protected bool $addComment = true;
+    protected bool $addComment = false;
 
     protected string $basePath = __DIR__;
 

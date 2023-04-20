@@ -102,42 +102,23 @@ namespace {
     use Itwmw\Validate\Attributes\Mysql\Rules\MysqlTinyint;
     use Itwmw\Validate\Attributes\Rules\Nullable;
 
-    /**
-     * 用户表
-     */
-    class User implements Stringable
+    class User
     {
         #[MysqlInt(false)]
         #[Numeric]
         #[Required]
         public int $id;
 
-        /**
-         * 名字
-         */
         #[MysqlVarchar(255)]
         #[Required]
         #[Preprocessor('', ProcessorExecCond::WHEN_EMPTY)]
         public string $name = '';
 
-        /**
-         * 年龄
-         */
         #[MysqlTinyint(true)]
         #[Numeric]
         #[Nullable]
         #[Preprocessor(18, ProcessorExecCond::WHEN_EMPTY)]
         public ?int $age = 18;
-
-        public function toArray(): array
-        {
-            return (array) $this;
-        }
-
-        public function __toString(): string
-        {
-            return json_encode($this->toArray(), JSON_UNESCAPED_UNICODE);
-        }
     }
 }
 ```
