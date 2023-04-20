@@ -47,6 +47,8 @@ class Config
 
     protected bool $generateSetter = false;
 
+    protected bool $writePropertyValidate = false;
+
     protected static Config $instance;
 
     public static function instance(): Config
@@ -289,6 +291,18 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置写入属性时是否进行验证
+     *
+     * @param bool $writePropertyValidate
+     * @return $this
+     */
+    public function setWritePropertyValidate(bool $writePropertyValidate): Config
+    {
+        $this->writePropertyValidate = $writePropertyValidate;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -372,5 +386,10 @@ class Config
     public function getGenerateSetter(): bool
     {
         return $this->generateSetter;
+    }
+
+    public function getWritePropertyValidate(): bool
+    {
+        return $this->writePropertyValidate;
     }
 }

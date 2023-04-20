@@ -26,6 +26,7 @@ use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
@@ -392,6 +393,9 @@ class Generator
     private function makeBaseDataClass(): void
     {
         if (!empty($namespace = $this->config->getNamespacePrefix())) {
+            if (!empty($this->config->getBaseNamespace())) {
+                $namespace = str_replace($this->config->getBaseNamespace(), '', $namespace);
+            }
             $baseDataPhpPath = $this->config->getBasePath()
                 . DIRECTORY_SEPARATOR
                 . str_replace('\\', DIRECTORY_SEPARATOR, $namespace)
@@ -615,9 +619,36 @@ class Generator
             ]
         ]);
 
+        if ($this->config->getWritePropertyValidate()) {
+            $setterExpression = [
+                new Expression(new Assign(new Variable('data'), new FuncCall(new Name('validate_attribute'), [
+                    new Arg(new ClassConstFetch(class:new Name(['static']), name: new Identifier('class'))),
+                    new Arg(value: new Array_([
+                        new ArrayItem(value: new ArrayDimFetch(new Variable('arguments'), new LNumber(0)), key: new Variable('property')),
+                    ])),
+                    new Arg(value: new Array_([
+                        new ArrayItem(value: new Variable('property')),
+                    ])),
+                ]))),
+                new Expression(new Assign(
+                    new PropertyFetch(new Variable('this'), new Variable('property')),
+                    new PropertyFetch(new Variable('data'), new Variable('property'))
+                )),
+            ];
+        } else {
+            $setterExpression = [
+                new Expression(
+                    new Assign(
+                        new PropertyFetch(new Variable('this'), new Variable('property')),
+                        new ArrayDimFetch(new Variable('arguments'), new LNumber(0))
+                    )
+                )
+            ];
+        }
+
         $setter = new If_(new Equal(left: new Variable('prefix'), right: new String_('set')), [
             'stmts' => [
-                new Expression(new Assign(new PropertyFetch(new Variable('this'), new Variable('property')), new ArrayDimFetch(new Variable('arguments'), new LNumber(0)))),
+                ...$setterExpression,
                 new Return_(new Variable('this'))
             ]
         ]);
