@@ -10,18 +10,24 @@ use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrayDimFetch;
 use PhpParser\Node\Expr\ArrayItem;
 use PhpParser\Node\Expr\Assign;
-use PhpParser\Node\Expr\BinaryOp\Equal;
+use PhpParser\Node\Expr\BinaryOp\BooleanAnd;
+use PhpParser\Node\Expr\BinaryOp\Identical;
+use PhpParser\Node\Expr\BinaryOp\NotIdentical;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
+use PhpParser\Node\Stmt\Throw_;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Scalar\LNumber;
 use PhpParser\Node\Scalar\String_;
+use PhpParser\Node\Stmt\Else_;
+use PhpParser\Node\Stmt\ElseIf_;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\If_;
@@ -33,6 +39,7 @@ use PhpParser\Node\Stmt\Return_;
 class GenerateFunc
 {
     protected BuilderFactory $builder;
+
     public function __construct(protected Config $config, protected  Trait_|Class_ $class)
     {
         $this->builder = new BuilderFactory();
@@ -40,90 +47,239 @@ class GenerateFunc
 
     public function addCallFunc(bool $force = false): void
     {
-        if (false === $force && !$this->config->getGenerateGetter()) {
-            if (!$this->config->getGenerateSetter() || $this->config->getPropertyReadOnly()) {
-                return;
-            }
+        $addGetter = $this->config->getGenerateGetter();
+        $addSetter = $this->config->getGenerateSetter() && !$this->config->getPropertyReadOnly();
+
+        if (!$addGetter && !$addSetter && !$force) {
+            return;
         }
 
         $callFunc = $this->builder->method('__call');
         $callFunc->makePublic();
         $callFunc->addParam($this->builder->param('name'));
         $callFunc->addParam($this->builder->param('arguments'));
-        $stmts  = [];
-        $prefix = new FuncCall(new Name('substr'), [
-            new Arg(new Variable('name')),
-            new Arg(new LNumber(0)),
-            new Arg(new LNumber(3))
-        ]);
-        $stmts[]  = new Expression(new Assign(new Variable('prefix'), $prefix));
-        $property = new FuncCall(new Name('lcfirst'), [
-            new Arg(new FuncCall(new Name('substr'), [
-                new Arg(new Variable('name')),
-                new Arg(new LNumber(3))
-            ]))
-        ]);
-        $stmts[]          = new Expression(new Assign(new Variable('property'), $property));
-        $ifPropertyExists = new FuncCall(new Name('property_exists'), [
-            new Arg(new Variable('this')),
-            new Arg(new Variable('property'))
-        ]);
-        $getter = new If_(new Equal(left: new Variable('prefix'), right: new String_('get')), [
-            'stmts' => [
-                new Return_(new PropertyFetch(new Variable('this'), new Variable('property')))
-            ]
-        ]);
 
-        if ($this->config->getWritePropertyValidate()) {
-            $setterExpression = [
-                new Expression(new Assign(new Variable('data'), new FuncCall(new Name('validate_attribute'), [
-                    new Arg(new ClassConstFetch(class:new Name(['static']), name: new Identifier('class'))),
-                    new Arg(value: new Array_([
-                        new ArrayItem(value: new ArrayDimFetch(new Variable('arguments'), new LNumber(0)), key: new Variable('property')),
-                    ])),
-                    new Arg(value: new Array_([
-                        new ArrayItem(value: new Variable('property')),
-                    ])),
-                ]))),
+        $prefix = new Expression(new Assign(
+            new Variable('prefix'),
+            new FuncCall(new Name('substr'), [
+                new Arg(new Variable('name')),
+                new Arg(new LNumber(0)),
+                new Arg(new LNumber(3))
+            ])
+        ));
+
+        if ($addSetter && $addGetter || $force) {
+            $ifPrefixEqSetOrGet = new If_(new BooleanAnd(
+                left: new NotIdentical(
+                    left: new String_('set'),
+                    right: new Variable('prefix')
+                ),
+                right: new NotIdentical(
+                    left: new String_('get'),
+                    right: new Variable('prefix')
+                )
+            ));
+        } elseif ($addGetter) {
+            $ifPrefixEqSetOrGet = new If_(new NotIdentical(
+                left: new String_('get'),
+                right: new Variable('prefix')
+            ));
+        } else {
+            $ifPrefixEqSetOrGet = new If_(new NotIdentical(
+                left: new String_('set'),
+                right: new Variable('prefix')
+            ));
+        }
+
+        $callParentCallFunc = new If_(new BooleanAnd(
+            left: new FuncCall(
+                name: new Name('class_parents'),
+                args: [
+                    new Arg(new ClassConstFetch(new Name('static'), 'class'))
+                ]
+            ),
+            right: new FuncCall(
+                name: new Name('method_exists'),
+                args: [
+                    new Arg(new ClassConstFetch(new Name('parent'), 'class')),
+                    new Arg(new String_('__call'))
+                ]
+            )
+        ));
+
+        $returnParentCall = new Return_(new StaticCall(
+            class: new Name('parent'),
+            name: new Identifier('__call'),
+            args: [
+                new Arg(new Variable('name')),
+                new Arg(new Variable('arguments'))
+            ]
+        ));
+
+        $callParentCallFunc->stmts = [
+            $returnParentCall
+        ];
+
+        $throwBadMethodCallException = new Throw_(new New_(new Name\FullyQualified('BadMethodCallException'), [
+            new Arg(new FuncCall(new Name('sprintf'), [
+                new Arg(new String_('Method %s::%s does not exist.')),
+                new ClassConstFetch(new Name('static'), new Identifier('class')),
+                new Arg(new Variable('name'))
+            ]))
+        ]));
+
+        if ($this->config->getAddFuncExtends()){
+            $ifPrefixEqSetOrGet->stmts[] = $callParentCallFunc;
+        }
+
+        $ifPrefixEqSetOrGet->stmts[] = $throwBadMethodCallException;
+
+        $funcProperty = new Expression(new Assign(new Variable('funcProperty'), new FuncCall(new Name('substr'), [
+            new Arg(new Variable('name')),
+            new Arg(new LNumber(3))
+        ])));
+
+        $property = new If_(new FuncCall(new Name('property_exists'), [
+            new Arg(new Variable('this')),
+            new Arg(new Variable('funcProperty'))
+        ]));
+
+        $property->stmts = [
+            new Expression(new Assign(new Variable('property'), new Variable('funcProperty')))
+        ];
+
+        $propertySnake = new ElseIf_(new FuncCall(new Name('property_exists'), [
+            new Arg(new Variable('this')),
+            new Arg(new StaticCall(new Name('Str'), new Identifier('snake'), [
+                new Arg(new Variable('funcProperty'))
+            ]))
+        ]));
+
+        $propertySnake->stmts = [
+            new Expression(new Assign(new Variable('property'), new StaticCall(new Name('Str'), new Identifier('snake'), [
+                new Arg(new Variable('funcProperty'))
+            ])))
+        ];
+
+        $propertyCamel = new ElseIf_(new FuncCall(new Name('property_exists'), [
+            new Arg(new Variable('this')),
+            new Arg(new StaticCall(new Name('Str'), new Identifier('camel'), [
+                new Arg(new Variable('funcProperty'))
+            ]))
+        ]));
+
+        $propertyCamel->stmts = [
+            new Expression(new Assign(new Variable('property'), new StaticCall(new Name('Str'), new Identifier('camel'), [
+                new Arg(new Variable('funcProperty'))
+            ])))
+        ];
+
+        $propertyStudly = new ElseIf_(new FuncCall(new Name('property_exists'), [
+            new Arg(new Variable('this')),
+            new Arg(new StaticCall(new Name('Str'), new Identifier('studly'), [
+                new Arg(new Variable('funcProperty'))
+            ]))
+        ]));
+
+        $propertyStudly->stmts = [
+            new Expression(new Assign(new Variable('property'), new StaticCall(new Name('Str'), new Identifier('studly'), [
+                new Arg(new Variable('funcProperty'))
+            ])))
+        ];
+
+        $property->elseifs = [
+            $propertySnake,
+            $propertyCamel,
+            $propertyStudly
+        ];
+
+        $property->else = new Else_();
+
+        if ($this->config->getAddFuncExtends()){
+            $property->else->stmts[] = $callParentCallFunc;
+        }
+
+        $property->else->stmts[] = $throwBadMethodCallException;
+
+        $prefixIsSet = new If_(new Identical(
+            left: new String_('set'),
+            right: new Variable('prefix')
+        ));
+
+        $validateData = new Expression(new Assign(new Variable('data'), new FuncCall(
+            name: new Name('validate_attribute'),
+            args: [
+                new Arg(new ClassConstFetch(new Name('static'), 'class')),
+                new Arg(new Array_([
+                    new ArrayItem(
+                        value: new ArrayDimFetch(new Variable('arguments'), new LNumber(0)),
+                        key: new Variable('property')
+                    )
+                ])),
+                new Arg(new Array_([
+                    new ArrayItem(new Variable('property'))
+                ]))
+            ]
+        )));
+
+        $assignValidateDataToClass = new Expression(new Assign(
+            new PropertyFetch(new Variable('this'), new Variable('property')),
+            new PropertyFetch(new Variable('data'), new Variable('property')),
+        ));
+
+        if ($this->config->getWritePropertyValidate()){
+            $setData = [
+                $validateData,
+                $assignValidateDataToClass
+            ];
+        }else{
+            $setData = [
                 new Expression(new Assign(
                     new PropertyFetch(new Variable('this'), new Variable('property')),
-                    new PropertyFetch(new Variable('data'), new Variable('property'))
-                )),
+                    new ArrayDimFetch(new Variable('arguments'), new LNumber(0)),
+                ))
             ];
+        }
+
+        $returnThis         = new Return_(new Variable('this'));
+        $prefixIsSet->stmts = [
+            ...$setData,
+            $returnThis
+        ];
+
+        $returnProperty = new Return_(new PropertyFetch(new Variable('this'), new Variable('property')));
+
+
+        if (!$force) {
+            $stmts = [
+                $prefix,
+                $ifPrefixEqSetOrGet,
+                $funcProperty,
+                $property
+            ];
+
+            if ($addSetter && $addGetter) {
+                $stmts[] = $prefixIsSet;
+            }
+
+            if ($addSetter && !$addGetter) {
+                $stmts = $stmts + $setData;
+                $stmts[] = $returnProperty;
+            }
+
+            if ($addGetter) {
+                $stmts[] = $returnProperty;
+            }
         } else {
-            $setterExpression = [
-                new Expression(
-                    new Assign(
-                        new PropertyFetch(new Variable('this'), new Variable('property')),
-                        new ArrayDimFetch(new Variable('arguments'), new LNumber(0))
-                    )
-                )
+            $stmts = [
+                $prefix,
+                $ifPrefixEqSetOrGet,
+                $funcProperty,
+                $property,
+                $prefixIsSet,
+                $returnProperty
             ];
         }
-
-        $setter = new If_(new Equal(left: new Variable('prefix'), right: new String_('set')), [
-            'stmts' => [
-                ...$setterExpression,
-                new Return_(new Variable('this'))
-            ]
-        ]);
-        $callSubFunc = [];
-        if (!$this->config->getPropertyReadOnly() && $this->config->getGenerateSetter() || $force) {
-            $callSubFunc[] = $setter;
-        }
-
-        if ($this->config->getGenerateGetter() || $force) {
-            $callSubFunc[] = $getter;
-        }
-
-        $stmts[] = new If_(cond: $ifPropertyExists, subNodes:[
-            'stmts' => $callSubFunc
-        ]);
-
-        $stmts[] = new Return_(new StaticCall(new Name('parent'), new Identifier('__call'), [
-            new Arg(new Variable('name')),
-            new Arg(new Variable('arguments'))
-        ]));
 
         $callFunc->addStmts($stmts);
         $this->class->addStmt($callFunc->getNode());
@@ -137,7 +293,7 @@ class GenerateFunc
 
         $createFunc->addParam($this->builder->param('data')->setType('array'));
 
-        $class  = new Expression(new Assign(new Variable('class'), new New_(new Name('static'))));
+        $class   = new Expression(new Assign(new Variable('class'), new New_(new Name('static'))));
         $foreach = new Foreach_(new Variable('data'), new Variable('value'), [
             'keyVar' => new Variable('key'),
             'stmts'  => [
@@ -171,12 +327,13 @@ class GenerateFunc
         $toStringFunc = $this->builder->method('__toString');
         $toStringFunc->makePublic();
         $toStringFunc->setReturnType('string');
-        $toStringFunc->addStmt(new Return_(
-            new FuncCall(new Name('json_encode'), [
-                new Arg(new FuncCall(new Name('$this->toArray'))),
-                new Arg(new ConstFetch(new Name('JSON_UNESCAPED_UNICODE')))
-            ])
-        ));
+
+        $return = new Return_(new FuncCall(new Name('json_encode'), [
+            new Arg(new MethodCall(new Variable('this'), new Identifier('toArray'))),
+            new Arg(new ConstFetch(new Name('JSON_UNESCAPED_UNICODE')))
+        ]));
+
+        $toStringFunc->addStmts([$return]);
         $this->class->addStmt($toStringFunc->getNode());
     }
 

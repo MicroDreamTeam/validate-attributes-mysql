@@ -11,6 +11,7 @@ use Itwmw\Validate\Attributes\Rules\Nullable;
 use Itwmw\Validate\Attributes\Rules\Numeric;
 use Itwmw\Validate\Attributes\Rules\Required;
 use Itwmw\Validate\Attributes\Rules\RuleInterface;
+use Itwmw\Validation\Support\Str;
 use PhpParser\Builder\Class_;
 use PhpParser\Builder\Trait_;
 use PhpParser\BuilderFactory;
@@ -205,39 +206,46 @@ class Generator
         $methodGenerator = new GenerateFunc($this->config, $class);
 
         if ($this->config->getAddFunc()) {
+            if ($this->config->getGenerateTrait() || $this->config->getGenerateSetter()) {
+                $namespace->addStmt($builder->use(Str::class)->getNode());
+            }
             if (!$this->config->getGenerateTrait()) {
                 if ($this->config->getAddFuncExtends()) {
                     $this->makeBaseDataClass();
                     $class->extend('BaseData');
                 } else {
                     $class->implement(Stringable::class);
-                    $methodGenerator->addToStringFunc();
                     $methodGenerator->addCallFunc();
+                    $methodGenerator->addToStringFunc();
                 }
             } else {
                 if ($this->config->getAddFuncExtends()) {
                     $this->makeBaseDataClass();
                     $class->addStmt($builder->useTrait('BaseDataTrait'));
                 } else {
-                    $methodGenerator->addToStringFunc();
-                    $methodGenerator->addCallFunc();
                     $methodGenerator->addCreateFunc();
+                    $methodGenerator->addCallFunc();
+                    $methodGenerator->addToStringFunc();
                 }
 
             }
 
             $methodGenerator->addToArrayFunc($fields);
         }
+        $comment = $methodComment;
+
         if ($this->config->getAddComment()) {
             $tableComment = $this->mysql->getTableComment($table);
 
             if (!empty($tableComment)) {
                 $comment = "$tableComment\n\n" . $methodComment;
-            } else {
-                $comment = $methodComment;
             }
+        }
+
+        if (!empty($comment)) {
             $class->setDocComment($this->makeComment($comment));
         }
+
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
@@ -497,27 +505,29 @@ class Generator
                     }
                 }
             }
+
+            $commentType = str_replace('?', 'null|', $type);
+
             if ($this->config->getAddComment()) {
                 $comment = '';
                 if (!empty($columns[$key]->comment)) {
                     $comment = $columns[$key]->comment;
                     $field->setDocComment($this->makeComment($comment));
                 }
-                $commentType = str_replace('?', 'null|', $type);
                 if ($useConstruct) {
                     $comment    = "@param $commentType \$$key $comment";
                     $comments[] = $comment;
                 }
+            }
 
-                $key = ucfirst($key);
-                if ($addGetter) {
-                    $getterMethodComments[] = "@method $commentType get${key}()";
+            $key = Str::studly($key);
+            if ($addGetter) {
+                $getterMethodComments[] = "@method $commentType get${key}()";
 
-                }
+            }
 
-                if ($addSetter) {
-                    $setterMethodComments[] = "@method \$this set${key}($commentType \$$key)";
-                }
+            if ($addSetter) {
+                $setterMethodComments[] = "@method \$this set${key}($commentType \$$key)";
             }
 
             foreach ($value as $item) {

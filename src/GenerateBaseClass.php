@@ -2,6 +2,7 @@
 
 namespace Itwmw\Validate\Attributes\Mysql;
 
+use Itwmw\Validation\Support\Str;
 use PhpParser\Builder\TraitUse;
 use PhpParser\BuilderFactory;
 
@@ -53,13 +54,15 @@ class GenerateBaseClass
 
         $builder   = new BuilderFactory();
         $namespace = $builder->namespace($this->config->getNamespacePrefix());
+        $namespace->addStmt($builder->use(Str::class)->getNode());
+
         $class     = $builder->trait('BaseDataTrait');
         $class->addStmt($builder->property('__' . $configInfo . '__')->setType('int')->makePrivate()->getNode());
         $methodGenerator = new GenerateFunc($this->config, $class);
-        $methodGenerator->addToStringFunc();
         $methodGenerator->addBaseToArrayFunc();
-        $methodGenerator->addCallFunc(true);
         $methodGenerator->addCreateFunc();
+        $methodGenerator->addCallFunc(true);
+        $methodGenerator->addToStringFunc();
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = Generator::getPhpCode([$ast]);
@@ -76,7 +79,7 @@ class GenerateBaseClass
             $namespace->addStmt($builder->use(\Stringable::class)->getNode());
         }
 
-        $class = $builder->class('BaseData')->implement(\Stringable::class);
+        $class = $builder->class('BaseData')->makeAbstract()->implement(\Stringable::class);
         $class->addStmt(new TraitUse('BaseDataTrait'));
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
