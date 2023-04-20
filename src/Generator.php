@@ -527,7 +527,8 @@ class Generator
             }
 
             if ($addSetter) {
-                $setterMethodComments[] = "@method \$this set${key}($commentType \$$key)";
+                $paramKey = lcfirst($key);
+                $setterMethodComments[] = "@method \$this set${key}($commentType \$$paramKey)";
             }
 
             foreach ($value as $item) {
