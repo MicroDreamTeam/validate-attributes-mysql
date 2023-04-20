@@ -58,6 +58,7 @@ class GenerateBaseClass
         $this->generator->addToStringFunc($class, $builder);
         $this->generator->addBaseToArrayFunc($class, $builder);
         $this->generator->addCallFunc($class, $builder, true);
+        $this->generator->addCreateFunc($class, $builder);
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->generator->getPhpCode([$ast]);

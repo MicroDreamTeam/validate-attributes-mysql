@@ -24,6 +24,7 @@ use PhpParser\Node\Expr\BinaryOp\Equal;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
@@ -32,6 +33,7 @@ use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\Stmt\Foreach_;
 use PhpParser\Node\Stmt\If_;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\PrettyPrinter\Standard;
@@ -225,6 +227,7 @@ class Generator
                 } else {
                     $this->addToStringFunc($class, $builder);
                     $this->addCallFunc($class, $builder);
+                    $this->addCreateFunc($class, $builder);
                 }
 
             }
@@ -673,6 +676,43 @@ class Generator
 
         $callFunc->addStmts($stmts);
         $class->addStmt($callFunc->getNode());
+    }
+
+    public function addCreateFunc(Trait_|Class_ $class, BuilderFactory $builder): void
+    {
+        $createFunc = $builder->method('create');
+        $createFunc->makePublic()->makeStatic();
+        $createFunc->setReturnType('static');
+
+        $createFunc->addParam($builder->param('data')->setType('array'));
+
+        $_class  = new Expression(new Assign(new Variable('class'), new New_(new Name('static'))));
+        $foreach = new Foreach_(new Variable('data'), new Variable('value'), [
+            'keyVar' => new Variable('key'),
+            'stmts'  => [
+                new If_(new FuncCall(new Name('property_exists'), [
+                    new Arg(new Variable('class')),
+                    new Arg(new Variable('key'))
+                ]), [
+                    'stmts' => [
+                        new Expression(
+                            new Assign(
+                                new PropertyFetch(
+                                    new Variable('class'),
+                                    new Variable('key')
+                                ),
+                                new Variable('value')
+                            )
+                        )
+                    ]
+                ])
+            ]
+        ]);
+
+        $return = new Return_(new Variable('class'));
+
+        $createFunc->addStmts([$_class, $foreach, $return]);
+        $class->addStmt($createFunc->getNode());
     }
 
     private function getDefaultForType(string $type): mixed
