@@ -284,7 +284,7 @@ class Generator
     {
         $type      = $column->type;
         $rules     = [];
-        $ruleClass = 'Itwmw\\Validate\\Attributes\\Mysql\\Rules\\Mysql' . ucfirst($type);
+        $ruleClass = 'Itwmw\\Validate\\Mysql\\Rules\\Attributes\\Mysql' . ucfirst($type);
         if (!class_exists($ruleClass)) {
             return null;
         }
