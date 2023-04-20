@@ -26,6 +26,7 @@ use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\New_;
 use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
@@ -673,6 +674,11 @@ class Generator
         $stmts[] = new If_(cond: $ifPropertyExists, subNodes:[
             'stmts' => $callSubFunc
         ]);
+
+        $stmts[] = new Expression(new StaticCall(new Name('parent'), new Identifier('__call'), [
+            new Arg(new Variable('name')),
+            new Arg(new Variable('arguments'))
+        ]));
 
         $callFunc->addStmts($stmts);
         $class->addStmt($callFunc->getNode());
