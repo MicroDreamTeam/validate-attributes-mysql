@@ -17,8 +17,10 @@ use PhpParser\BuilderFactory;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\Array_;
+use PhpParser\Node\Expr\ArrayDimFetch;
 use PhpParser\Node\Expr\ArrayItem;
 use PhpParser\Node\Expr\Assign;
+use PhpParser\Node\Expr\BinaryOp\Equal;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\ConstFetch;
 use PhpParser\Node\Expr\FuncCall;
@@ -29,6 +31,7 @@ use PhpParser\Node\Scalar\DNumber;
 use PhpParser\Node\Scalar\LNumber;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\Stmt\If_;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\PrettyPrinter\Standard;
 use SplFileInfo;
@@ -140,8 +143,9 @@ class Generator
         if (empty($columns)) {
             throw new \RuntimeException("Table {$table} not found");
         }
-        $rules    = [];
-        $allClass = [];
+        $rules         = [];
+        $allClass      = [];
+        $methodComment = '';
 
         foreach ($columns as $column) {
             $rules[$column->field] = $this->makeValidateRule($column);
@@ -152,6 +156,7 @@ class Generator
             $rules[$column->field] = $allRules;
         }
 
+        $fields           = array_keys($rules);
         $builder          = new BuilderFactory();
         $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
         $namespace        = $builder->namespace($namespace_string);
@@ -177,14 +182,7 @@ class Generator
             $class = $builder->class(is_null($class_name) ? ucfirst($table) : $class_name);
         }
 
-        if ($this->config->getAddComment()) {
-            $tableComment = $this->mysql->getTableComment($table);
-            if (!empty($tableComment)) {
-                $class->setDocComment($this->makeComment($tableComment));
-            }
-        }
-
-        $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct());
+        $this->addFieldToClass($rules, $class, $columns, $builder, $this->config->getUseConstruct(), $methodComment);
 
         if ($this->config->getAddFunc()) {
             if (!$this->config->getGenerateTrait()) {
@@ -194,14 +192,24 @@ class Generator
                 } else {
                     $class->implement(\Stringable::class);
                     $this->addToStringFunc($class, $builder);
+                    $this->addCallFunc($class, $builder);
                 }
             } else {
                 $this->addToStringFunc($class, $builder);
+                $this->addCallFunc($class, $builder);
             }
 
-            $this->addToArrayFunc($class, $builder, array_keys($rules));
+            $this->addToArrayFunc($class, $builder, $fields);
         }
+        if ($this->config->getAddComment()) {
+            $tableComment = $this->mysql->getTableComment($table);
 
+            $comment = '';
+            if (!empty($tableComment)) {
+                $comment = "$tableComment\n\n" . $methodComment;
+            }
+            $class->setDocComment($this->makeComment($comment));
+        }
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
@@ -405,6 +413,7 @@ class Generator
         $class = $builder->class('BaseData')->implement(\Stringable::class);
         $this->addToStringFunc($class, $builder);
         $this->addBaseToArrayFunc($class, $builder);
+        $this->addCallFunc($class, $builder);
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
@@ -424,16 +433,21 @@ class Generator
         return "/**\n * {$comment}\n */";
     }
 
-    private function addFieldToClass(array $rules, Class_|Trait_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false): void
+    private function addFieldToClass(array $rules, Class_|Trait_ $class, array $columns, BuilderFactory $builder, bool $useConstruct = false, string &$methodComment = ''): void
     {
-        $params   = [];
-        $comments = [];
-        $propertyScope = "make".ucfirst($this->config->getPropertyScope());
-        $propertyReadOnly = $this->config->getPropertyReadOnly();
+        $methodComment        = '';
+        $params               = [];
+        $comments             = [];
+        $getterMethodComments = [];
+        $setterMethodComments = [];
+        $addGetter            = $this->config->getGenerateGetter();
+        $addSetter            = $this->config->getGenerateSetter() && !$this->config->getPropertyReadOnly();
+        $propertyScope        = 'make' . ucfirst($this->config->getPropertyScope());
+        $propertyReadOnly     = $this->config->getPropertyReadOnly();
         foreach ($rules as $key => $value) {
             $field = $builder->property($key);
             $field->$propertyScope();
-            if ($propertyReadOnly){
+            if ($propertyReadOnly) {
                 $field->makeReadonly();
             }
             $type = strtolower($this->typeMap[$columns[$key]->type]) ?? 'mixed';
@@ -441,7 +455,7 @@ class Generator
                 $default = $this->getDefaultValue($columns[$key]->default, $type);
                 $type    = "?$type";
                 $field->setType($type);
-                if (!$propertyReadOnly){
+                if (!$propertyReadOnly) {
                     $field->setDefault($default);
                 }
                 if ($useConstruct) {
@@ -458,7 +472,7 @@ class Generator
                     $param->setType($type);
                 }
                 if (!is_null($default)) {
-                    if (!$propertyReadOnly){
+                    if (!$propertyReadOnly) {
                         $field->setDefault($default);
                     }
                     if ($useConstruct) {
@@ -482,10 +496,20 @@ class Generator
                     $comment = $columns[$key]->comment;
                     $field->setDocComment($this->makeComment($comment));
                 }
+                $commentType = str_replace('?', 'null|', $type);
                 if ($useConstruct) {
-                    $commentType = str_replace('?', 'null|', $type);
-                    $comment     = "@param $commentType \$$key $comment";
-                    $comments[]  = $comment;
+                    $comment    = "@param $commentType \$$key $comment";
+                    $comments[] = $comment;
+                }
+
+                $key = ucfirst($key);
+                if ($addGetter) {
+                    $getterMethodComments[] = "@method $commentType get${key}()";
+
+                }
+
+                if ($addSetter) {
+                    $setterMethodComments[] = "@method \$this set${key}($commentType \$$key)";
                 }
             }
 
@@ -494,6 +518,8 @@ class Generator
             }
             $class->addStmt($field->getNode());
         }
+
+        $methodComment = implode("\n", array_merge($getterMethodComments, $setterMethodComments));
 
         if ($useConstruct) {
             $method = $builder->method('__construct');
@@ -551,6 +577,65 @@ class Generator
             ])
         ));
         $class->addStmt($toStringFunc->getNode());
+    }
+
+    private function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder): void
+    {
+        if (!$this->config->getGenerateGetter()) {
+            if (!$this->config->getGenerateSetter() || $this->config->getPropertyReadOnly()) {
+                return;
+            }
+        }
+
+        $callFunc = $builder->method('__call');
+        $callFunc->makePublic();
+        $callFunc->addParam($builder->param('name'));
+        $callFunc->addParam($builder->param('arguments'));
+        $stmts  = [];
+        $prefix = new FuncCall(new Name('substr'), [
+            new Arg(new Variable('name')),
+            new Arg(new LNumber(0)),
+            new Arg(new LNumber(3))
+        ]);
+        $stmts[]  = new Expression(new Assign(new Variable('prefix'), $prefix));
+        $property = new FuncCall(new Name('lcfirst'), [
+            new Arg(new FuncCall(new Name('substr'), [
+                new Arg(new Variable('name')),
+                new Arg(new LNumber(3))
+            ]))
+        ]);
+        $stmts[]          = new Expression(new Assign(new Variable('property'), $property));
+        $ifPropertyExists = new FuncCall(new Name('property_exists'), [
+            new Arg(new Variable('this')),
+            new Arg(new Variable('property'))
+        ]);
+        $getter = new If_(new Equal(left: new Variable('prefix'), right: new String_('get')), [
+            'stmts' => [
+                new Return_(new PropertyFetch(new Variable('this'), new Variable('property')))
+            ]
+        ]);
+
+        $setter = new If_(new Equal(left: new Variable('prefix'), right: new String_('set')), [
+            'stmts' => [
+                new Expression(new Assign(new PropertyFetch(new Variable('this'), new Variable('property')), new ArrayDimFetch(new Variable('arguments'), new LNumber(0)))),
+                new Return_(new Variable('this'))
+            ]
+        ]);
+        $callSubFunc = [];
+        if (!$this->config->getPropertyReadOnly() && $this->config->getGenerateSetter()) {
+            $callSubFunc[] = $setter;
+        }
+
+        if ($this->config->getGenerateGetter()) {
+            $callSubFunc[] = $getter;
+        }
+
+        $stmts[] = new If_(cond: $ifPropertyExists, subNodes:[
+            'stmts' => $callSubFunc
+        ]);
+
+        $callFunc->addStmts($stmts);
+        $class->addStmt($callFunc->getNode());
     }
 
     private function getDefaultForType(string $type): mixed

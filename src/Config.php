@@ -43,6 +43,10 @@ class Config
 
     protected bool $propertyReadOnly = false;
 
+    protected bool $generateGetter = false;
+
+    protected bool $generateSetter = false;
+
     protected static Config $instance;
 
     public static function instance(): Config
@@ -261,6 +265,30 @@ class Config
         return $this;
     }
 
+    /**
+     * 设置是否生成getter
+     *
+     * @param bool $generateGetter
+     * @return $this
+     */
+    public function setGenerateGetter(bool $generateGetter): Config
+    {
+        $this->generateGetter = $generateGetter;
+        return $this;
+    }
+
+    /**
+     * 设置是否生成setter
+     *
+     * @param bool $generateSetter
+     * @return $this
+     */
+    public function setGenerateSetter(bool $generateSetter): Config
+    {
+        $this->generateSetter = $generateSetter;
+        return $this;
+    }
+
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
@@ -334,5 +362,15 @@ class Config
     public function getPropertyReadOnly(): bool
     {
         return $this->propertyReadOnly;
+    }
+
+    public function getGenerateGetter(): bool
+    {
+        return $this->generateGetter;
+    }
+
+    public function getGenerateSetter(): bool
+    {
+        return $this->generateSetter;
     }
 }
