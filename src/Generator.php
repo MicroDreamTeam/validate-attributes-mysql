@@ -413,7 +413,7 @@ class Generator
         $class = $builder->class('BaseData')->implement(\Stringable::class);
         $this->addToStringFunc($class, $builder);
         $this->addBaseToArrayFunc($class, $builder);
-        $this->addCallFunc($class, $builder);
+        $this->addCallFunc($class, $builder, true);
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
@@ -579,9 +579,9 @@ class Generator
         $class->addStmt($toStringFunc->getNode());
     }
 
-    private function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder): void
+    private function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder, bool $force = false): void
     {
-        if (!$this->config->getGenerateGetter()) {
+        if (false === $force && !$this->config->getGenerateGetter()) {
             if (!$this->config->getGenerateSetter() || $this->config->getPropertyReadOnly()) {
                 return;
             }
@@ -622,11 +622,11 @@ class Generator
             ]
         ]);
         $callSubFunc = [];
-        if (!$this->config->getPropertyReadOnly() && $this->config->getGenerateSetter()) {
+        if (!$this->config->getPropertyReadOnly() && $this->config->getGenerateSetter() || $force) {
             $callSubFunc[] = $setter;
         }
 
-        if ($this->config->getGenerateGetter()) {
+        if ($this->config->getGenerateGetter() || $force) {
             $callSubFunc[] = $getter;
         }
 
