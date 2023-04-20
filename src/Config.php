@@ -15,6 +15,8 @@ class Config
 
     protected ?string $namespacePrefix = null;
 
+    protected ?string $baseNamespace = null;
+
     protected bool $addFunc = true;
 
     protected bool $addFuncExtends = false;
@@ -78,6 +80,27 @@ class Config
             }
         }
         $this->namespacePrefix = $namespacePrefix;
+        return $this;
+    }
+
+    /**
+     * 设置基础命名空间
+     *
+     * @param string|null $baseNamespace
+     * @return $this
+     */
+    public function setBaseNamespace(?string $baseNamespace): Config
+    {
+        if (!is_null($baseNamespace)) {
+            if (str_ends_with($baseNamespace, '\\')) {
+                $baseNamespace = substr($baseNamespace, 0, -1);
+            }
+
+            if (str_starts_with($baseNamespace, '\\')) {
+                $baseNamespace = substr($baseNamespace, 1);
+            }
+        }
+        $this->baseNamespace = $baseNamespace;
         return $this;
     }
 
@@ -306,6 +329,11 @@ class Config
     public function getNamespacePrefix(): ?string
     {
         return $this->namespacePrefix;
+    }
+
+    public function getBaseNamespace(): ?string
+    {
+        return $this->baseNamespace;
     }
 
     public function getAddFunc(): bool

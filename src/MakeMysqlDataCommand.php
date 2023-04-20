@@ -6,7 +6,6 @@ use Itwmw\Validation\Support\Str;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class MakeMysqlDataCommand extends Command
@@ -14,32 +13,17 @@ class MakeMysqlDataCommand extends Command
     protected function configure()
     {
         $this->setName('make:mysql-data')->setDescription('根据数据库表生成数据类')
-            ->addArgument('table', InputArgument::REQUIRED, '表名')
-            ->addOption('namespace', 'a', InputOption::VALUE_OPTIONAL, '命名空间前缀', Config::instance()->getNamespacePrefix())
-            ->addOption('add-func', 'f', InputOption::VALUE_OPTIONAL, '是否添加函数', Config::instance()->getAddFunc())
-            ->addOption('add-func-extends', 'e', InputOption::VALUE_OPTIONAL, '是否通过继承的方式添加函数', Config::instance()->getAddFuncExtends())
-            ->addOption('split-table-name', 's', InputOption::VALUE_OPTIONAL, '是否拆分表名', Config::instance()->getSplitTableName())
-            ->addOption('base-path', 'b', InputOption::VALUE_OPTIONAL, '基础路径', Config::instance()->getBasePath())
-            ->addOption('remove-table-prefix', 'r', InputOption::VALUE_OPTIONAL, '要删除的表前缀', Config::instance()->getRemoveTablePrefix())
-            ->addOption('add-comment', 'c', InputOption::VALUE_OPTIONAL, '是否添加注释', Config::instance()->getAddComment());
+            ->addArgument('table', InputArgument::REQUIRED, '表名');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        if (!class_exists("Itwmw\Table\Structure\Mysql\Mysql")){
+        if (!class_exists("Itwmw\Table\Structure\Mysql\Mysql")) {
             $output->writeln("\033[0;31m\nError: Please reinstall the itwmw/validate-attributes-mysql package. To use the command-line functionality, you will need to install the dependencies in the require-dev section of this package.\033[0m");
             return 1;
         }
-        $config = clone Config::instance();
-        $config->setNamespacePrefix($input->getOption('namespace'))
-            ->setAddFunc($input->getOption('add-func'))
-            ->setAddFuncExtends($input->getOption('add-func-extends'))
-            ->setSplitTableName($input->getOption('split-table-name'))
-            ->setBasePath($input->getOption('base-path'))
-            ->setRemoveTablePrefix($input->getOption('remove-table-prefix'))
-            ->setAddComment($input->getOption('add-comment'));
-
-        $table = $input->getArgument('table');
+        $config = Config::instance();
+        $table  = $input->getArgument('table');
         if (null !== $config->getTableArgHandler()) {
             $table = call_user_func($config->getTableArgHandler(), $table);
         }
@@ -65,11 +49,18 @@ class MakeMysqlDataCommand extends Command
             $newTableName = Str::studly($newTableName);
         }
 
+        if (empty($config->getBaseNamespace())) {
+            $fileNameSpace = $namespace ?: '';
+        } else {
+            $fileNameSpace = str_replace($config->getBaseNamespace(), '', $namespace ?: '');
+        }
+
         $filePaths = [
             $config->getBasePath(),
-            str_replace('\\', DIRECTORY_SEPARATOR, $namespace ?: ''),
+            str_replace('\\', DIRECTORY_SEPARATOR, $fileNameSpace ?: ''),
             $newTableName
         ];
+
         $filePaths = array_filter($filePaths);
         $filePath  = implode(DIRECTORY_SEPARATOR, $filePaths) . '.php';
         $dir       = dirname($filePath);

@@ -405,8 +405,19 @@ class Generator
             $baseDataPhpPath = $this->config->getBasePath() . '/BaseData.php';
         }
 
+        $configInfo = sprintf(
+            '%d',
+            $this->config->getWritePropertyValidate(),
+        );
+        $configInfo = str_replace(1, 'O', $configInfo);
+
         if (file_exists($baseDataPhpPath)) {
-            return;
+            $class = $this->config->getNamespacePrefix() . '\\' . 'BaseData';
+            if (!class_exists($class) || !property_exists($class, '__' . $configInfo . '__')) {
+                @unlink($baseDataPhpPath);
+            } else {
+                return;
+            }
         }
 
         $builder   = new BuilderFactory();
@@ -415,6 +426,7 @@ class Generator
             $namespace->addStmt($builder->use(\Stringable::class)->getNode());
         }
         $class = $builder->class('BaseData')->implement(\Stringable::class);
+        $class->addStmt($builder->property('__' . $configInfo . '__')->setType('int')->makePrivate()->getNode());
         $this->addToStringFunc($class, $builder);
         $this->addBaseToArrayFunc($class, $builder);
         $this->addCallFunc($class, $builder, true);
