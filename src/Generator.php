@@ -39,6 +39,9 @@ use SplFileInfo;
 use W7\Validate\Support\Processor\ProcessorExecCond;
 use W7\Validate\Support\Processor\ProcessorSupport;
 
+/**
+ * @internal
+ */
 class Generator
 {
     protected MysqlConnection $connection;
@@ -179,12 +182,18 @@ class Generator
 
         if ($this->config->getAddFunc()
             && !$this->config->getAddFuncExtends()
+            && !$this->config->getGenerateTrait()
             && !empty($namespace_string)
         ) {
             $allClass[] = \Stringable::class;
         }
-        if ($namespace_string !== $this->config->getNamespacePrefix()) {
-            $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
+
+        if ($namespace_string !== $this->config->getNamespacePrefix() && $this->config->getAddFuncExtends()) {
+            if ($this->config->getGenerateTrait()) {
+                $allClass[] = $this->config->getNamespacePrefix() . '\BaseDataTrait';
+            } else {
+                $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
+            }
         }
 
         foreach ($allClass as $class) {
@@ -210,8 +219,14 @@ class Generator
                     $this->addCallFunc($class, $builder);
                 }
             } else {
-                $this->addToStringFunc($class, $builder);
-                $this->addCallFunc($class, $builder);
+                if ($this->config->getAddFuncExtends()) {
+                    $this->makeBaseDataClass();
+                    $class->addStmt($builder->useTrait('BaseDataTrait'));
+                } else {
+                    $this->addToStringFunc($class, $builder);
+                    $this->addCallFunc($class, $builder);
+                }
+
             }
 
             $this->addToArrayFunc($class, $builder, $fields);
@@ -379,7 +394,7 @@ class Generator
         return $default;
     }
 
-    private function getPhpCode(array $ast): string
+    public function getPhpCode(array $ast): string
     {
         $prettyPrinter = new Standard([
             'shortArraySyntax' => true
@@ -388,7 +403,7 @@ class Generator
         return $prettyPrinter->prettyPrintFile($ast);
     }
 
-    private function fixPhpCode(string $php): string
+    public function fixPhpCode(string $php): string
     {
         $fix = new Fixer();
         // 使用内置规则先强制修复一次
@@ -406,49 +421,13 @@ class Generator
 
     private function makeBaseDataClass(): void
     {
-        if (!empty($namespace = $this->config->getNamespacePrefix())) {
-            if (!empty($this->config->getBaseNamespace())) {
-                $namespace = str_replace($this->config->getBaseNamespace(), '', $namespace);
-            }
-            $baseDataPhpPath = $this->config->getBasePath()
-                . DIRECTORY_SEPARATOR
-                . str_replace('\\', DIRECTORY_SEPARATOR, $namespace)
-                . DIRECTORY_SEPARATOR
-                . '/BaseData.php';
-        } else {
-            $baseDataPhpPath = $this->config->getBasePath() . '/BaseData.php';
+        $baseGenerator = new GenerateBaseClass($this->config, $this);
+        if (!$baseGenerator->checkClassNeedUpdate()) {
+            return;
         }
 
-        $configInfo = sprintf(
-            '%d',
-            $this->config->getWritePropertyValidate(),
-        );
-        $configInfo = str_replace(1, 'O', $configInfo);
-
-        if (file_exists($baseDataPhpPath)) {
-            $class = $this->config->getNamespacePrefix() . '\\' . 'BaseData';
-            if (!class_exists($class) || !property_exists($class, '__' . $configInfo . '__')) {
-                @unlink($baseDataPhpPath);
-            } else {
-                return;
-            }
-        }
-
-        $builder   = new BuilderFactory();
-        $namespace = $builder->namespace($this->config->getNamespacePrefix());
-        if (!empty($this->config->getNamespacePrefix())) {
-            $namespace->addStmt($builder->use(\Stringable::class)->getNode());
-        }
-        $class = $builder->class('BaseData')->implement(\Stringable::class);
-        $class->addStmt($builder->property('__' . $configInfo . '__')->setType('int')->makePrivate()->getNode());
-        $this->addToStringFunc($class, $builder);
-        $this->addBaseToArrayFunc($class, $builder);
-        $this->addCallFunc($class, $builder, true);
-        $namespace->addStmt($class);
-        $ast = $namespace->getNode();
-        $php = $this->getPhpCode([$ast]);
-        $php = $this->fixPhpCode($php);
-        file_put_contents($baseDataPhpPath, $php);
+        $baseGenerator->generateTrait();
+        $baseGenerator->generateClass();
     }
 
     private function makeComment(string $comment): string
@@ -584,7 +563,7 @@ class Generator
         $class->addStmt($method->getNode());
     }
 
-    private function addBaseToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder): void
+    public function addBaseToArrayFunc(Class_|Trait_ $class, BuilderFactory $builder): void
     {
         $toArrayFunc = $builder->method('toArray');
         $toArrayFunc->makePublic();
@@ -595,7 +574,7 @@ class Generator
         $class->addStmt($toArrayFunc->getNode());
     }
 
-    private function addToStringFunc(Trait_|Class_ $class, BuilderFactory $builder): void
+    public function addToStringFunc(Trait_|Class_ $class, BuilderFactory $builder): void
     {
         $toStringFunc = $builder->method('__toString');
         $toStringFunc->makePublic();
@@ -609,7 +588,7 @@ class Generator
         $class->addStmt($toStringFunc->getNode());
     }
 
-    private function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder, bool $force = false): void
+    public function addCallFunc(Trait_|Class_ $class, BuilderFactory $builder, bool $force = false): void
     {
         if (false === $force && !$this->config->getGenerateGetter()) {
             if (!$this->config->getGenerateSetter() || $this->config->getPropertyReadOnly()) {

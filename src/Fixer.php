@@ -10,6 +10,9 @@ use PhpCsFixer\Tokenizer\Tokens;
 use PhpCsFixer\ToolInfo;
 use SplFileInfo;
 
+/**
+ * @internal
+ */
 class Fixer
 {
     private array $defaultFixers = [];
