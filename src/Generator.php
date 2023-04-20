@@ -234,9 +234,10 @@ class Generator
         if ($this->config->getAddComment()) {
             $tableComment = $this->mysql->getTableComment($table);
 
-            $comment = '';
             if (!empty($tableComment)) {
                 $comment = "$tableComment\n\n" . $methodComment;
+            } else {
+                $comment = $methodComment;
             }
             $class->setDocComment($this->makeComment($comment));
         }
