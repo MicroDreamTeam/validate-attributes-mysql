@@ -400,11 +400,13 @@ class Generator
     {
         $propertyScope    = 'make' . ucfirst($this->config->getPropertyScope());
         $propertyReadOnly = $this->config->getPropertyReadOnly();
+        $addComment       = $this->config->getAddComment();
         $handler->each(function (FieldInfo $fieldInfo, string $key) use (
             $builder,
             $propertyScope,
             $propertyReadOnly,
-            $class
+            $class,
+            $addComment
         ) {
             $field = $builder->property($key);
             $field->$propertyScope();
@@ -415,6 +417,10 @@ class Generator
             $field->setType($fieldInfo->type);
             if (!$propertyReadOnly && !($fieldInfo->default instanceof None)) {
                 $field->setDefault($fieldInfo->default);
+            }
+
+            if ($addComment && !empty($fieldInfo->comment)) {
+                $field->setDocComment(self::makeComment($fieldInfo->comment));
             }
 
             foreach ($fieldInfo->attribute as $item) {
