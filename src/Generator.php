@@ -209,12 +209,14 @@ class Generator
             if ($this->config->getGenerateTrait() || $this->config->getGenerateSetter()) {
                 $namespace->addStmt($builder->use(Str::class)->getNode());
             }
+
             if (!$this->config->getGenerateTrait()) {
                 if ($this->config->getAddFuncExtends()) {
                     $this->makeBaseDataClass();
                     $class->extend('BaseData');
                 } else {
                     $class->implement(Stringable::class);
+                    $methodGenerator->addCreateFunc();
                     $methodGenerator->addCallFunc();
                     $methodGenerator->addToStringFunc();
                 }
@@ -527,7 +529,7 @@ class Generator
             }
 
             if ($addSetter) {
-                $paramKey = lcfirst($key);
+                $paramKey               = lcfirst($key);
                 $setterMethodComments[] = "@method \$this set${key}($commentType \$$paramKey)";
             }
 
