@@ -113,9 +113,8 @@ class Generator
         if (empty($columns)) {
             throw new RuntimeException("Table {$table} not found");
         }
-        $rules         = [];
-        $allClass      = [];
-        $methodComment = '';
+        $rules    = [];
+        $allClass = [];
 
         foreach ($columns as $column) {
             $rules[$column->field] = $this->makeValidateRule($column);
@@ -166,6 +165,7 @@ class Generator
             $methodGenerator->addConstructFunc($fieldHandler);
         }
 
+        $comment = '';
         if ($this->config->getAddFunc()) {
             if ($this->config->getGenerateTrait() || $this->config->getGenerateSetter()) {
                 $namespace->addStmt($builder->use(Str::class)->getNode());
@@ -194,14 +194,18 @@ class Generator
             }
 
             $methodGenerator->addToArrayFunc($fields);
+            $comment = $this->getMethodComment($fieldHandler);
         }
-        $comment = $this->getMethodComment($fieldHandler);
 
         if ($this->config->getAddComment()) {
             $tableComment = $this->mysql->getTableComment($table);
 
             if (!empty($tableComment)) {
-                $comment = "$tableComment\n\n" . $comment;
+                if (empty($comment)) {
+                    $comment = $tableComment;
+                } else {
+                    $comment = "$tableComment\n\n" . $comment;
+                }
             }
         }
 
