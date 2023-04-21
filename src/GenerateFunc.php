@@ -128,7 +128,7 @@ class GenerateFunc
             ]))
         ]));
 
-        if ($this->config->getAddFuncExtends()){
+        if ($this->config->getAddFuncExtends()) {
             $ifPrefixEqSetOrGet->stmts[] = $callParentCallFunc;
         }
 
@@ -195,7 +195,7 @@ class GenerateFunc
 
         $property->else = new Else_();
 
-        if ($this->config->getAddFuncExtends()){
+        if ($this->config->getAddFuncExtends()) {
             $property->else->stmts[] = $callParentCallFunc;
         }
 
@@ -227,12 +227,12 @@ class GenerateFunc
             new PropertyFetch(new Variable('data'), new Variable('property')),
         ));
 
-        if ($this->config->getWritePropertyValidate()){
+        if ($this->config->getWritePropertyValidate()) {
             $setData = [
                 $validateData,
                 $assignValidateDataToClass
             ];
-        }else{
+        } else {
             $setData = [
                 new Expression(new Assign(
                     new PropertyFetch(new Variable('this'), new Variable('property')),
@@ -249,7 +249,6 @@ class GenerateFunc
 
         $returnProperty = new Return_(new PropertyFetch(new Variable('this'), new Variable('property')));
 
-
         if (!$force) {
             $stmts = [
                 $prefix,
@@ -263,7 +262,7 @@ class GenerateFunc
             }
 
             if ($addSetter && !$addGetter) {
-                $stmts = $stmts + $setData;
+                $stmts   = $stmts + $setData;
                 $stmts[] = $returnProperty;
             }
 
@@ -292,8 +291,22 @@ class GenerateFunc
         $createFunc->setReturnType('static');
 
         $createFunc->addParam($this->builder->param('data')->setType('array'));
+        if ($this->config->getWritePropertyValidate()) {
+            $createFunc->addParam($this->builder->param('fields')->setType('array')->setDefault(null));
+        }
 
-        $class   = new Expression(new Assign(new Variable('class'), new New_(new Name('static'))));
+        $class = new Expression(new Assign(new Variable('class'), new New_(new Name('static'), [
+            new Arg(new Variable('data'), unpack: true)
+        ])));
+
+        $validateData = new Return_(
+            new FuncCall(new Name('validate_attribute'), [
+                new Arg(new Variable('class')),
+                new Arg(new Variable('data')),
+                new Arg(new Variable('fields')),
+            ])
+        );
+
         $foreach = new Foreach_(new Variable('data'), new Variable('value'), [
             'keyVar' => new Variable('key'),
             'stmts'  => [
@@ -315,10 +328,14 @@ class GenerateFunc
                 ])
             ]
         ]);
-
         $return = new Return_(new Variable('class'));
 
-        $createFunc->addStmts([$class, $foreach, $return]);
+        if ($this->config->getWritePropertyValidate()) {
+            $createFunc->addStmts([$class, $validateData]);
+        } else {
+            $createFunc->addStmts([$class, $foreach, $return]);
+        }
+
         $this->class->addStmt($createFunc->getNode());
     }
 
@@ -358,6 +375,37 @@ class GenerateFunc
             $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
         }
         $method->addStmt(new Return_($array));
+        $this->class->addStmt($method->getNode());
+    }
+
+    public function addConstructFunc(FieldHandler $handler): void
+    {
+        $method = $this->builder->method('__construct');
+        $method->makePublic();
+        $handler = clone $handler;
+        $handler->sort();
+        if ($this->config->getConstructAllOptional()) {
+            $handler->addDefault();
+        }
+
+        $comments = [];
+        $handler->each(function (FieldInfo $field) use ($method, &$comments) {
+            $param = $this->builder->param($field->name)->setType($field->type);
+            if (!($field->default instanceof None)) {
+                $param->setDefault($field->default);
+            }
+            $method->addParam($param);
+            $method->addStmt(new Expression(new Assign(
+                new PropertyFetch(new Variable('this'), $field->name),
+                new Variable($field->name)
+            )));
+
+            $comments[] = sprintf('@param %s $%s %s', $field->commentType, $field->name, $field->comment);
+        });
+
+        if ($this->config->getAddComment()) {
+            $method->setDocComment(Generator::makeComment(implode("\n", $comments)));
+        }
         $this->class->addStmt($method->getNode());
     }
 }

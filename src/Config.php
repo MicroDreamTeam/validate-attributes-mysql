@@ -13,42 +13,61 @@ class Config
 
     public const PROPERTY_SCOPE_PRIVATE = 'private';
 
+    /** @var string|null 数据类命名空间前缀 */
     protected ?string $namespacePrefix = null;
 
+    /** @var string|null 数据类型基础命名空间，对应BasePath */
     protected ?string $baseNamespace = null;
 
+    /** @var bool 是否添加方法 */
     protected bool $addFunc = false;
 
+    /** @var bool 是否通过继承的方法来添加方法 */
     protected bool $addFuncExtends = false;
 
+    /** @var bool 分割表名 */
     protected bool $splitTableName = false;
 
+    /** @var bool 是否添加属实 */
     protected bool $addComment = false;
 
+    /** @var string 基础路径 */
     protected string $basePath = __DIR__;
 
+    /** @var string 要删除的表前缀 */
     protected string $removeTablePrefix = '';
 
+    /** @var array<string, string> Mysql和PHP的数据类型映射 */
     protected array $typeMap = [];
 
+    /** @var array 数据库连接信息 */
     protected array $mysqlConnection = [];
 
+    /** @var bool 是否生成Trait */
     protected bool $generateTrait = false;
 
+    /** @var Closure|null 命令行中的table参数处理程序 */
     protected ?Closure $tableArgHandler = null;
 
+    /** @var bool 是否使用构造函数 */
     protected bool $useConstruct = false;
 
+    /** @var bool 构造函数中的参数是否全部为可选 */
     protected bool $constructAllOptional = false;
 
+    /** @var string 属性的作用域 */
     protected string $propertyScope = 'public';
 
+    /** @var bool 属性是否为只读 */
     protected bool $propertyReadOnly = false;
 
+    /** @var bool 是否生成获取器 */
     protected bool $generateGetter = false;
 
+    /** @var bool 是否生成修改器 */
     protected bool $generateSetter = false;
 
+    /** @var bool 写入数据是否进行验证 */
     protected bool $writePropertyValidate = false;
 
     protected static Config $instance;
