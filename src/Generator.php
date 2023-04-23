@@ -98,7 +98,7 @@ class Generator
     private function checkConfig(): void
     {
         if ($this->config->getGenerateSetter() || $this->config->getGenerateTrait()) {
-            if ($this->config->getAddFuncExtends() && Config::PROPERTY_SCOPE_PRIVATE === $this->config->getPropertyScope()) {
+            if ($this->config->getAddFuncExtends() && Config::PROPERTY_MODIFIER_PRIVATE === $this->config->getPropertyModifier()) {
                 throw new RuntimeException('当使用继承来扩展方法时，获取器和修改器无法访问私有属性');
             }
         }
@@ -399,7 +399,7 @@ class Generator
 
     private function addFieldToClass(FieldHandler $handler, Class_|Trait_ $class): void
     {
-        $propertyModifier    = 'make' . ucfirst($this->config->getPropertyModifier());
+        $propertyModifier = 'make' . ucfirst($this->config->getPropertyModifier());
         $propertyReadOnly = $this->config->getPropertyReadOnly();
         $addComment       = $this->config->getAddComment();
         $handler->each(function (FieldInfo $fieldInfo, string $key) use (
