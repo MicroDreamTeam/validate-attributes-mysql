@@ -49,8 +49,8 @@ Config::instance()->setMysqlConnection($database);
 - `setUseConstruct` 是否使用构造函数，启用后会在类中添加构造函数
 - `setConstructAllOptional` 构造函数是否全部可选，启用后，构造函数中的参数全部可选,仅当 `useConstruct` 为 `true` 时有效
 - `setTableArgHandler` 表名处理函数，可自定义表名处理方式，如：`function ($tableName) { return 't_' . $tableName; }`
-- `setPropertyScope` 属性作用域，可自定义属性作用域，如：`private`,默认为 `public`
-- `setPropertyReadOnly` 属性是否只读，启用后，属性类型会添加 `readonly` 关键字
+- `setPropertyModifier` 属性修饰符，可自定义属性修饰符，如：`private`,默认为 `public`
+- `setPropertyReadOnly` 属性是否只读，启用后，属性修饰符会添加 `readonly` 关键字
 - `setGenerateSetter` 是否生成修改器，启用后，会生成修改器，如：`setName`，`setAge`
 - `setGenerateGetter` 是否生成访问器，启用后，会生成访问器，如：`getName`，`getAge`
 - `setWritePropertyValidate` 是否启用写入数据时验证数据，启用后，当使用修改器，会自动验证数据

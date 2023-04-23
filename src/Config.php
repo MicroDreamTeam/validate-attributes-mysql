@@ -7,11 +7,11 @@ use JetBrains\PhpStorm\ExpectedValues;
 
 class Config
 {
-    public const PROPERTY_SCOPE_PUBLIC = 'public';
+    public const PROPERTY_MODIFIER_PUBLIC = 'public';
 
-    public const PROPERTY_SCOPE_PROTECTED = 'protected';
+    public const PROPERTY_MODIFIER_PROTECTED = 'protected';
 
-    public const PROPERTY_SCOPE_PRIVATE = 'private';
+    public const PROPERTY_MODIFIER_PRIVATE = 'private';
 
     /** @var string|null 数据类命名空间前缀 */
     protected ?string $namespacePrefix = null;
@@ -55,8 +55,8 @@ class Config
     /** @var bool 构造函数中的参数是否全部为可选 */
     protected bool $constructAllOptional = false;
 
-    /** @var string 属性的作用域 */
-    protected string $propertyScope = 'public';
+    /** @var string 属性的修饰符 */
+    protected string $propertyModifier = 'public';
 
     /** @var bool 属性是否为只读 */
     protected bool $propertyReadOnly = false;
@@ -284,16 +284,16 @@ class Config
     }
 
     /**
-     * 设置属性作用域
+     * 设置属性修饰符
      *
-     * @param string $propertyScope
+     * @param string $propertyModifier
      * @return $this
      */
-    public function setPropertyScope(
+    public function setPropertyModifier(
         #[ExpectedValues(valuesFromClass: Config::class)]
-        string $propertyScope
+        string $propertyModifier
     ): Config {
-        $this->propertyScope = $propertyScope;
+        $this->propertyModifier = $propertyModifier;
         return $this;
     }
 
@@ -415,9 +415,9 @@ class Config
         return $this->constructAllOptional;
     }
 
-    public function getPropertyScope(): string
+    public function getPropertyModifier(): string
     {
-        return $this->propertyScope;
+        return $this->propertyModifier;
     }
 
     public function getPropertyReadOnly(): bool

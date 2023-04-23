@@ -399,17 +399,17 @@ class Generator
 
     private function addFieldToClass(FieldHandler $handler, Class_|Trait_ $class): void
     {
-        $propertyScope    = 'make' . ucfirst($this->config->getPropertyScope());
+        $propertyModifier    = 'make' . ucfirst($this->config->getPropertyModifier());
         $propertyReadOnly = $this->config->getPropertyReadOnly();
         $addComment       = $this->config->getAddComment();
         $handler->each(function (FieldInfo $fieldInfo, string $key) use (
-            $propertyScope,
+            $propertyModifier,
             $propertyReadOnly,
             $class,
             $addComment
         ) {
             $field = new Property($key);
-            $field->$propertyScope();
+            $field->$propertyModifier();
             if ($propertyReadOnly) {
                 $field->makeReadonly();
             }
