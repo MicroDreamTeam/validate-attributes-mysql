@@ -284,7 +284,7 @@ class GenerateFunc
         $this->class->addStmt($callFunc->getNode());
     }
 
-    public function addCreateFunc(): void
+    public function addCreateFunc(?FieldHandler $handler = null): void
     {
         $createFunc = $this->builder->method('create');
         $createFunc->makePublic()->makeStatic();
@@ -295,9 +295,12 @@ class GenerateFunc
             $createFunc->addParam($this->builder->param('fields')->setType('array')->setDefault(null));
         }
 
-        $class = new Expression(new Assign(new Variable('class'), new New_(new Name('static'), [
+        $class = new Expression(new Assign(new Variable('class'), new New_(
+            new Name('static'),
+            $this->config->getUseConstruct() && !$this->config->getAddFuncExtends() ? [
             new Arg(new Variable('data'), unpack: true)
-        ])));
+        ] : []
+        )));
 
         $validateData = new Return_(
             new FuncCall(new Name('validate_attribute'), [
@@ -334,6 +337,29 @@ class GenerateFunc
             $createFunc->addStmts([$class, $validateData]);
         } else {
             $createFunc->addStmts([$class, $foreach, $return]);
+        }
+
+        if (!is_null($handler)) {
+            $dataParamInfo = [];
+            $handler->each(function (FieldInfo $field) use (&$dataParamInfo) {
+                $dataParamInfo[] = sprintf('    %s: %s', $field->name, $field->type);
+            });
+            $comment = "@param array{\n" . implode(",\n", $dataParamInfo) . "\n} \$data";
+            if ($this->config->getWritePropertyValidate()) {
+                $comment .= "\n@param array|null \$fields";
+            }
+            $comment .= "\n\n@return static";
+            if (empty($this->config->getNamespacePrefix())) {
+                $comment .= "\n\n@throws ReflectionException";
+            } else {
+                $comment .= "\n\n@throws \ReflectionException";
+            }
+
+            if ($this->config->getWritePropertyValidate()) {
+                $comment .= "\n@throws \W7\Validate\Exception\ValidateException";
+            }
+            $comment .= "\n\n@noinspection PhpFullyQualifiedNameUsageInspection";
+            $createFunc->setDocComment(Generator::makeComment($comment));
         }
 
         $this->class->addStmt($createFunc->getNode());

@@ -13,6 +13,7 @@ use Itwmw\Validate\Attributes\Rules\Required;
 use Itwmw\Validate\Attributes\Rules\RuleInterface;
 use Itwmw\Validation\Support\Str;
 use PhpParser\Builder\Class_;
+use PhpParser\Builder\Property;
 use PhpParser\Builder\Trait_;
 use PhpParser\BuilderFactory;
 use PhpParser\Node\Attribute;
@@ -159,7 +160,7 @@ class Generator
 
         $methodGenerator = new GenerateFunc($this->config, $class);
         $fieldHandler    = new FieldHandler($rules, $columns, $this->typeMap);
-        $this->addFieldToClass($fieldHandler, $class, $builder);
+        $this->addFieldToClass($fieldHandler, $class);
 
         if ($this->config->getUseConstruct()) {
             $methodGenerator->addConstructFunc($fieldHandler);
@@ -177,7 +178,7 @@ class Generator
                     $class->extend('BaseData');
                 } else {
                     $class->implement(Stringable::class);
-                    $methodGenerator->addCreateFunc();
+                    $methodGenerator->addCreateFunc($fieldHandler);
                     $methodGenerator->addCallFunc();
                     $methodGenerator->addToStringFunc();
                 }
@@ -186,7 +187,7 @@ class Generator
                     $this->makeBaseDataClass();
                     $class->addStmt($builder->useTrait('BaseDataTrait'));
                 } else {
-                    $methodGenerator->addCreateFunc();
+                    $methodGenerator->addCreateFunc($fieldHandler);
                     $methodGenerator->addCallFunc();
                     $methodGenerator->addToStringFunc();
                 }
@@ -396,19 +397,18 @@ class Generator
         return "/**\n * {$comment}\n */";
     }
 
-    private function addFieldToClass(FieldHandler $handler, Class_|Trait_ $class, BuilderFactory $builder): void
+    private function addFieldToClass(FieldHandler $handler, Class_|Trait_ $class): void
     {
         $propertyScope    = 'make' . ucfirst($this->config->getPropertyScope());
         $propertyReadOnly = $this->config->getPropertyReadOnly();
         $addComment       = $this->config->getAddComment();
         $handler->each(function (FieldInfo $fieldInfo, string $key) use (
-            $builder,
             $propertyScope,
             $propertyReadOnly,
             $class,
             $addComment
         ) {
-            $field = $builder->property($key);
+            $field = new Property($key);
             $field->$propertyScope();
             if ($propertyReadOnly) {
                 $field->makeReadonly();
