@@ -206,13 +206,17 @@ class UpdateDataClassGenerator extends Generator
 
         // 添加基础方法
         $methodGenerator = new GenerateFunc($this->config, $class);
-        if ($this->config->getAddFunc() && !$this->config->getAddFuncExtends()) {
-            $methodGenerator->addCreateFunc($fieldHandler);
-            $methodGenerator->addCallFunc();
-            $methodGenerator->addToStringFunc();
+
+        if ($this->config->getAddFunc()) {
+            if (!$this->config->getAddFuncExtends()) {
+                $methodGenerator->addCreateFunc($fieldHandler);
+                $methodGenerator->addCallFunc();
+                $methodGenerator->addToStringFunc();
+            }
+
             $comment = $this->getMethodComment($fieldHandler);
+            $methodGenerator->addToArrayFunc(array_keys($fields));
         }
-        $methodGenerator->addToArrayFunc(array_keys($fields));
 
         // 处理类注释
         if ($this->config->getAddComment()) {
