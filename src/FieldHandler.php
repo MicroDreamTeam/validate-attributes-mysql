@@ -4,7 +4,7 @@ namespace Itwmw\Validate\Attributes\Mysql;
 
 class FieldHandler
 {
-    /** @var array<FieldInfo>  */
+    /** @var array<string, FieldInfo>  */
     protected array $fields = [];
 
     public static array $length = [
@@ -86,6 +86,11 @@ class FieldHandler
             }
         });
         return $this;
+    }
+
+    public function getFields(): array
+    {
+        return $this->fields;
     }
 
     public function each(callable $callback): static

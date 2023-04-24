@@ -27,7 +27,6 @@ class MakeMysqlDataCommand extends Command
         if (null !== $config->getTableArgHandler()) {
             $table = call_user_func($config->getTableArgHandler(), $table);
         }
-        $generator    = new Generator($config);
         $newTableName = str_replace($config->getRemoveTablePrefix(), '', $table);
         $namespace    = $config->getNamespacePrefix();
 
@@ -69,7 +68,19 @@ class MakeMysqlDataCommand extends Command
         }
 
         try {
-            $phpCode = $generator->makeDataClass($table, $namespace, $newTableName);
+            if (file_exists($filePath)) {
+                $generator = new UpdateDataClassGenerator($config);
+                $phpCode   = file_get_contents($filePath);
+                $phpCode   = $generator->make($table, $phpCode, $namespace, $newTableName);
+                if (false === $phpCode) {
+                    $output->writeln("<error>$table generate fail</error>");
+                    return 1;
+                }
+            } else {
+                $generator = new NewDataClassGenerator($config);
+                $phpCode   = $generator->make($table, $namespace, $newTableName);
+            }
+
         } catch (\RuntimeException $e) {
             $output->writeln("<error>{$e->getMessage()}</error>");
             return 1;

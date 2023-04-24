@@ -9,12 +9,8 @@ use PhpParser\BuilderFactory;
 /**
  * @internal
  */
-class GenerateBaseClass
+class GenerateBaseClass extends Generator
 {
-    public function __construct(protected Config $config)
-    {
-    }
-
     public function getFilePath(string $class_name): string
     {
         if (!empty($namespace = $this->config->getNamespacePrefix())) {
@@ -70,8 +66,8 @@ class GenerateBaseClass
         $methodGenerator->addToStringFunc();
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
-        $php = Generator::getPhpCode([$ast]);
-        $php = Generator::fixPhpCode($php);
+        $php = $this->getPhpCode([$ast]);
+        $php = $this->fixPhpCode($php);
         file_put_contents($path, $php);
     }
 
@@ -88,8 +84,8 @@ class GenerateBaseClass
         $class->addStmt(new TraitUse('BaseDataTrait'));
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
-        $php = Generator::getPhpCode([$ast]);
-        $php = Generator::fixPhpCode($php);
+        $php = $this->getPhpCode([$ast]);
+        $php = $this->fixPhpCode($php);
         file_put_contents($path, $php);
     }
 }

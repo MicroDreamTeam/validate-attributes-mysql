@@ -60,7 +60,11 @@ class Fixer
                     'trait_import' => 'none',
                     'case'         => 'none'
                 ]
-            ]
+            ],
+            'ordered_imports' => [
+                'sort_algorithm' => 'alpha',
+            ],
+            'ordered_class_elements' => true
         ];
     }
 

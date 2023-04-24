@@ -12,10 +12,7 @@ use Itwmw\Validate\Attributes\Rules\Numeric;
 use Itwmw\Validate\Attributes\Rules\Required;
 use Itwmw\Validate\Attributes\Rules\RuleInterface;
 use Itwmw\Validation\Support\Str;
-use PhpParser\Builder\Class_;
 use PhpParser\Builder\Property;
-use PhpParser\Builder\Trait_;
-use PhpParser\BuilderFactory;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\ArrayItem;
@@ -28,7 +25,6 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\PrettyPrinter\Standard;
 use RuntimeException;
 use SplFileInfo;
-use Stringable;
 use W7\Validate\Support\Processor\ProcessorExecCond;
 use W7\Validate\Support\Processor\ProcessorSupport;
 
@@ -108,12 +104,12 @@ class Generator
         }
     }
 
-    public function makeDataClass(string $table, string $namespace_string = null, string $class_name = null): string
+    /**
+     * @param Column[] $columns
+     * @return array<array<string,array>,array<string>>
+     */
+    protected function getRules(array $columns): array
     {
-        $columns = $this->getTableColumns($table);
-        if (empty($columns)) {
-            throw new RuntimeException("Table {$table} not found");
-        }
         $rules    = [];
         $allClass = [];
 
@@ -126,102 +122,7 @@ class Generator
             $rules[$column->field] = $allRules;
         }
 
-        $fields           = array_keys($rules);
-        $builder          = new BuilderFactory();
-        $namespace_string = is_null($namespace_string) ? $this->config->getNamespacePrefix() : $namespace_string;
-        $namespace        = $builder->namespace($namespace_string);
-        $allClass         = array_unique($allClass);
-
-        if ($this->config->getAddFunc()
-            && !$this->config->getAddFuncExtends()
-            && !$this->config->getGenerateTrait()
-            && !empty($namespace_string)
-        ) {
-            $allClass[] = Stringable::class;
-        }
-
-        if ($namespace_string !== $this->config->getNamespacePrefix() && $this->config->getAddFuncExtends()) {
-            if ($this->config->getGenerateTrait()) {
-                $allClass[] = $this->config->getNamespacePrefix() . '\BaseDataTrait';
-            } else {
-                $allClass[] = $this->config->getNamespacePrefix() . '\BaseData';
-            }
-        }
-
-        foreach ($allClass as $class) {
-            $namespace->addStmt($builder->use($class)->getNode());
-        }
-
-        if ($this->config->getGenerateTrait()) {
-            $class = $builder->trait(is_null($class_name) ? ucfirst($table) : $class_name);
-        } else {
-            $class = $builder->class(is_null($class_name) ? ucfirst($table) : $class_name);
-        }
-
-        $methodGenerator = new GenerateFunc($this->config, $class);
-        $fieldHandler    = new FieldHandler($rules, $columns, $this->typeMap);
-        $this->addFieldToClass($fieldHandler, $class);
-
-        if ($this->config->getUseConstruct()) {
-            $methodGenerator->addConstructFunc($fieldHandler);
-        }
-
-        $comment = '';
-        if ($this->config->getAddFunc()) {
-            if ($this->config->getGenerateTrait() || $this->config->getGenerateSetter()) {
-                $namespace->addStmt($builder->use(Str::class)->getNode());
-            }
-
-            if (!$this->config->getGenerateTrait()) {
-                if ($this->config->getAddFuncExtends()) {
-                    $this->makeBaseDataClass();
-                    $class->extend('BaseData');
-                } else {
-                    $class->implement(Stringable::class);
-                    $methodGenerator->addCreateFunc($fieldHandler);
-                    $methodGenerator->addCallFunc();
-                    $methodGenerator->addToStringFunc();
-                }
-            } else {
-                if ($this->config->getAddFuncExtends()) {
-                    $this->makeBaseDataClass();
-                    $class->addStmt($builder->useTrait('BaseDataTrait'));
-                } else {
-                    $methodGenerator->addCreateFunc($fieldHandler);
-                    $methodGenerator->addCallFunc();
-                    $methodGenerator->addToStringFunc();
-                }
-
-            }
-
-            $methodGenerator->addToArrayFunc($fields);
-            $comment = $this->getMethodComment($fieldHandler);
-        }
-
-        if ($this->config->getAddComment()) {
-            $tableComment = $this->mysql->getTableComment($table);
-
-            if (!empty($tableComment)) {
-                if (empty($comment)) {
-                    $comment = $tableComment;
-                } else {
-                    $comment = "$tableComment\n\n" . $comment;
-                }
-            }
-        }
-
-        if (!empty($comment)) {
-            $class->setDocComment($this->makeComment($comment));
-        }
-
-        $namespace->addStmt($class);
-        $ast = $namespace->getNode();
-        $php = $this->getPhpCode([$ast]);
-        if ($this->config->getAddFunc()) {
-            $fixToArrayFunc = new FixToArrayFunc($php);
-            $php            = $fixToArrayFunc->fix();
-        }
-        return $this->fixPhpCode($php);
+        return [$rules, array_unique($allClass)];
     }
 
     protected function paramsToAst(mixed $value): DNumber|ConstFetch|LNumber|String_|Array_
@@ -278,7 +179,7 @@ class Generator
      * @param string $table
      * @return Column[]
      */
-    private function getTableColumns(string $table): array
+    protected function getTableColumns(string $table): array
     {
         return $this->mysql->listTableColumns($table);
     }
@@ -349,7 +250,7 @@ class Generator
         return $rules;
     }
 
-    public static function getPhpCode(array $ast): string
+    protected function getPhpCode(array $ast): string
     {
         $prettyPrinter = new Standard([
             'shortArraySyntax' => true
@@ -358,7 +259,7 @@ class Generator
         return $prettyPrinter->prettyPrintFile($ast);
     }
 
-    public static function fixPhpCode(string $php): string
+    protected function fixPhpCode(string $php): string
     {
         $fix = new Fixer();
         // 使用内置规则先强制修复一次
@@ -374,7 +275,7 @@ class Generator
         return $php;
     }
 
-    private function makeBaseDataClass(): void
+    protected function makeBaseDataClass(): void
     {
         $baseGenerator = new GenerateBaseClass($this->config);
         if (!$baseGenerator->checkClassNeedUpdate()) {
@@ -397,41 +298,35 @@ class Generator
         return "/**\n * {$comment}\n */";
     }
 
-    private function addFieldToClass(FieldHandler $handler, Class_|Trait_ $class): void
+    protected function builderField(FieldInfo $fieldInfo): Property
     {
         $propertyModifier = 'make' . ucfirst($this->config->getPropertyModifier());
         $propertyReadOnly = $this->config->getPropertyReadOnly();
         $addComment       = $this->config->getAddComment();
-        $handler->each(function (FieldInfo $fieldInfo, string $key) use (
-            $propertyModifier,
-            $propertyReadOnly,
-            $class,
-            $addComment
-        ) {
-            $field = new Property($key);
-            $field->$propertyModifier();
-            if ($propertyReadOnly) {
-                $field->makeReadonly();
-            }
 
-            $field->setType($fieldInfo->type);
-            if (!$propertyReadOnly && !($fieldInfo->default instanceof None)) {
-                $field->setDefault($fieldInfo->default);
-            }
+        $field = new Property($fieldInfo->name);
+        $field->$propertyModifier();
+        if ($propertyReadOnly) {
+            $field->makeReadonly();
+        }
 
-            if ($addComment && !empty($fieldInfo->comment)) {
-                $field->setDocComment(self::makeComment($fieldInfo->comment));
-            }
+        $field->setType($fieldInfo->type);
+        if (!$propertyReadOnly && !($fieldInfo->default instanceof None)) {
+            $field->setDefault($fieldInfo->default);
+        }
 
-            foreach ($fieldInfo->attribute as $item) {
-                $field->addAttribute($item);
-            }
+        if ($addComment && !empty($fieldInfo->comment)) {
+            $field->setDocComment(self::makeComment($fieldInfo->comment));
+        }
 
-            $class->addStmt($field->getNode());
-        });
+        foreach ($fieldInfo->attribute as $item) {
+            $field->addAttribute($item);
+        }
+
+        return $field;
     }
 
-    private function getMethodComment(FieldHandler $handler): string
+    protected function getMethodComment(FieldHandler $handler): string
     {
         $addGetter = $this->config->getGenerateGetter();
         $addSetter = $this->config->getGenerateSetter() && !$this->config->getPropertyReadOnly();

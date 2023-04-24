@@ -2,8 +2,13 @@
 
 namespace Itwmw\Validate\Attributes\Mysql;
 
-use PhpParser\Builder\Class_;
-use PhpParser\Builder\Trait_;
+use PhpParser\Builder;
+use PhpParser\Builder\Class_ as BuilderClass;
+use PhpParser\Builder\Trait_ as BuilderTrait;
+use PhpParser\BuilderHelpers;
+use PhpParser\Node\Stmt;
+use PhpParser\Node\Stmt\Class_ as NodeClass;
+use PhpParser\Node\Stmt\Trait_ as NodeTrait;
 use PhpParser\BuilderFactory;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\Array_;
@@ -40,9 +45,20 @@ class GenerateFunc
 {
     protected BuilderFactory $builder;
 
-    public function __construct(protected Config $config, protected  Trait_|Class_ $class)
+    public function __construct(protected Config $config, protected  BuilderClass|BuilderTrait|NodeClass|NodeTrait $class)
     {
         $this->builder = new BuilderFactory();
+    }
+
+    public function addStmt(Stmt|Builder $stmt)
+    {
+        if ($this->class instanceof BuilderTrait || $this->class instanceof BuilderClass) {
+            return $this->class->addStmt($stmt);
+        } else {
+            $stmt                 = BuilderHelpers::normalizeNode($stmt);
+            $this->class->stmts[] = $stmt;
+            return $this->class;
+        }
     }
 
     public function addCallFunc(bool $force = false): void
@@ -281,7 +297,7 @@ class GenerateFunc
         }
 
         $callFunc->addStmts($stmts);
-        $this->class->addStmt($callFunc->getNode());
+        $this->addStmt($callFunc->getNode());
     }
 
     public function addCreateFunc(?FieldHandler $handler = null): void
@@ -362,7 +378,7 @@ class GenerateFunc
             $createFunc->setDocComment(Generator::makeComment($comment));
         }
 
-        $this->class->addStmt($createFunc->getNode());
+        $this->addStmt($createFunc->getNode());
     }
 
     public function addToStringFunc(): void
@@ -377,7 +393,7 @@ class GenerateFunc
         ]));
 
         $toStringFunc->addStmts([$return]);
-        $this->class->addStmt($toStringFunc->getNode());
+        $this->addStmt($toStringFunc->getNode());
     }
 
     public function addBaseToArrayFunc(): void
@@ -388,7 +404,7 @@ class GenerateFunc
         $toArrayFunc->addStmt(new Return_(
             new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
         ));
-        $this->class->addStmt($toArrayFunc->getNode());
+        $this->addStmt($toArrayFunc->getNode());
     }
 
     public function addToArrayFunc(array $fields): void
@@ -401,7 +417,7 @@ class GenerateFunc
             $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
         }
         $method->addStmt(new Return_($array));
-        $this->class->addStmt($method->getNode());
+        $this->addStmt($method->getNode());
     }
 
     public function addConstructFunc(FieldHandler $handler): void
@@ -432,6 +448,6 @@ class GenerateFunc
         if ($this->config->getAddComment()) {
             $method->setDocComment(Generator::makeComment(implode("\n", $comments)));
         }
-        $this->class->addStmt($method->getNode());
+        $this->addStmt($method->getNode());
     }
 }
