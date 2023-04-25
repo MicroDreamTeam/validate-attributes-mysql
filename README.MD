@@ -46,8 +46,6 @@ Config::instance()->setMysqlConnection($database);
 - `setRemoveTablePrefix` 生成的数据类要移除的表前缀，如： `t_`
 - `setTypeMap` 字段类型映射，可自定义字段类型映射，如： `['json' => 'array']`
 - `setGenerateTrait` 是否生成 `Trait` ，启用后会生成 `trait` 文件,否则生成类文件
-- `setUseConstruct` 是否使用构造函数，启用后会在类中添加构造函数
-- `setConstructAllOptional` 构造函数是否全部可选，启用后，构造函数中的参数全部可选,仅当 `useConstruct` 为 `true` 时有效
 - `setTableArgHandler` 表名处理函数，可自定义表名处理方式，如：`function ($tableName) { return 't_' . $tableName; }`
 - `setPropertyModifier` 属性修饰符，可自定义属性修饰符，如：`private`,默认为 `public`
 - `setPropertyReadOnly` 属性是否只读，启用后，属性修饰符会添加 `readonly` 关键字
@@ -172,25 +170,35 @@ print_r($data);
 //    [age] => 18
 //)
 ```
-也可以在生成类验证数据时，使用`setUseConstruct`方法，启用后会在类中添加构造函数，构造函数如下：
+也可以在生成类验证数据时，使用 `setAddFunc` 方法，启用后会在类中添加一些基础方法，然后使用 `create` 方法来创建一个数据类：
 ```php
 /**
- * @param int $id
- * @param string $name 名字
- * @param null|int $age 年龄
+ * @param array{
+ *     id: int,
+ *     name: string,
+ *     age: ?int,
+ * } $data
+ * @param array|null $fields
+ *
+ * @return static
+ *
+ * @throws ReflectionException
+ * @throws \W7\Validate\Exception\ValidateException
  */
-public function __construct(int $id, string $name = '', ?int $age = 18)
+public static function create(array $data, array $fields = null): static
 {
-    $this->id   = $id;
-    $this->name = $name;
-    $this->age  = $age;
+    $class = new static();
+    return validate_attribute($class, $data, $fields);
 }
 ```
-> 为了代码更容易维护，这里没有使用`php8`的新特征 [Constructor property promotion](https://www.php.net/manual/en/language.oop5.decon.php#language.oop5.decon.constructor.promotion)
 
 使用示例如下：
 ```php
-$user = new User(1, 'test', 18);
+$user = User::create([
+    'id'   => 1,
+    'name' => 'test',
+    'age'  => 18
+]);
 $data = validate_attribute($user);
 print_r($data);
 // 输出：
@@ -203,7 +211,11 @@ print_r($data);
 ```
 当然，你也可以将这两种使用方式结合起来：
 ```php
-$user = new User(1, 'test', 18);
+$user = User::create([
+    'id'   => 1,
+    'name' => 'test',
+    'age'  => 18
+]);
 $data = validate_attribute($user, [
     'name' => '虞灪',
     'age'  => 20

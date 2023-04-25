@@ -28,7 +28,7 @@ class FixToArrayFunc
 
                 if (T_RETURN === $token[0] && 1 === $toArrayFuncReturnIndex) {
                     $toArrayFuncReturnIndex = 2;
-                    $returnArrayLine = $token[2];
+                    $returnArrayLine        = $token[2];
                     continue;
                 }
 

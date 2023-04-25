@@ -52,10 +52,6 @@ class NewDataClassGenerator extends Generator
         $fieldHandler    = new FieldHandler($rules, $columns, $this->typeMap);
         $this->addFieldToClass($fieldHandler, $class);
 
-        if ($this->config->getUseConstruct()) {
-            $methodGenerator->addConstructFunc($fieldHandler);
-        }
-
         $comment = '';
         if ($this->config->getAddFunc()) {
             if ($this->config->getGenerateTrait() || $this->config->getGenerateSetter()) {

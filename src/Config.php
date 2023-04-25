@@ -49,12 +49,6 @@ class Config
     /** @var Closure|null 命令行中的table参数处理程序 */
     protected ?Closure $tableArgHandler = null;
 
-    /** @var bool 是否使用构造函数 */
-    protected bool $useConstruct = false;
-
-    /** @var bool 构造函数中的参数是否全部为可选 */
-    protected bool $constructAllOptional = false;
-
     /** @var string 属性的修饰符 */
     protected string $propertyModifier = 'public';
 
@@ -260,30 +254,6 @@ class Config
     }
 
     /**
-     * 设置是否使用构造函数
-     *
-     * @param bool $useConstruct
-     * @return $this
-     */
-    public function setUseConstruct(bool $useConstruct): Config
-    {
-        $this->useConstruct = $useConstruct;
-        return $this;
-    }
-
-    /**
-     * 设置构造函数参数是否全部可选
-     *
-     * @param bool $constructAllOptional
-     * @return $this
-     */
-    public function setConstructAllOptional(bool $constructAllOptional): Config
-    {
-        $this->constructAllOptional = $constructAllOptional;
-        return $this;
-    }
-
-    /**
      * 设置属性修饰符
      *
      * @param string $propertyModifier
@@ -403,16 +373,6 @@ class Config
     public function getGenerateTrait(): bool
     {
         return $this->generateTrait;
-    }
-
-    public function getUseConstruct(): bool
-    {
-        return $this->useConstruct;
-    }
-
-    public function getConstructAllOptional(): bool
-    {
-        return $this->constructAllOptional;
     }
 
     public function getPropertyModifier(): string

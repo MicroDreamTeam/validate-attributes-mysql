@@ -312,10 +312,7 @@ class GenerateFunc
         }
 
         $class = new Expression(new Assign(new Variable('class'), new New_(
-            new Name('static'),
-            $this->config->getUseConstruct() && !$this->config->getAddFuncExtends() ? [
-            new Arg(new Variable('data'), unpack: true)
-        ] : []
+            new Name('static')
         )));
 
         $validateData = new Return_(
@@ -417,37 +414,6 @@ class GenerateFunc
             $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
         }
         $method->addStmt(new Return_($array));
-        $this->addStmt($method->getNode());
-    }
-
-    public function addConstructFunc(FieldHandler $handler): void
-    {
-        $method = $this->builder->method('__construct');
-        $method->makePublic();
-        $handler = clone $handler;
-        $handler->sort();
-        if ($this->config->getConstructAllOptional()) {
-            $handler->addDefault();
-        }
-
-        $comments = [];
-        $handler->each(function (FieldInfo $field) use ($method, &$comments) {
-            $param = $this->builder->param($field->name)->setType($field->type);
-            if (!($field->default instanceof None)) {
-                $param->setDefault($field->default);
-            }
-            $method->addParam($param);
-            $method->addStmt(new Expression(new Assign(
-                new PropertyFetch(new Variable('this'), $field->name),
-                new Variable($field->name)
-            )));
-
-            $comments[] = sprintf('@param %s $%s %s', $field->commentType, $field->name, $field->comment);
-        });
-
-        if ($this->config->getAddComment()) {
-            $method->setDocComment(Generator::makeComment(implode("\n", $comments)));
-        }
         $this->addStmt($method->getNode());
     }
 }
