@@ -7,23 +7,41 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt;
 use PhpParser\Builder;
-use PhpParser\ParserFactory;
+use PhpParser\Lexer;
+use PhpParser\NodeTraverser;
+use PhpParser\Parser;
+use PhpParser\NodeVisitor;
+use PhpParser\PrettyPrinter;
 
 class UpdateDataClassGenerator extends Generator
 {
     public function make(string $table, string $phpCode, string $namespace_string = null, string $class_name = null): bool|string
     {
-        $parser = (new ParserFactory())->create(ParserFactory::PREFER_PHP7);
+        $lexer = new Lexer\Emulative([
+            'usedAttributes' => [
+                'comments',
+                'startLine', 'endLine',
+                'startTokenPos', 'endTokenPos',
+            ],
+        ]);
+        $parser    = new Parser\Php7($lexer);
+        $traverser = new NodeTraverser();
+        $traverser->addVisitor(new NodeVisitor\CloningVisitor());
+        $printer = new PrettyPrinter\Standard([
+            'shortArraySyntax' => true
+        ]);
+
         try {
-            $ast = $parser->parse($phpCode);
+            $oldStmts  = $parser->parse($phpCode);
+            $oldTokens = $lexer->getTokens();
+            $newStmts  = $traverser->traverse($oldStmts);
         } catch (Error) {
             return false;
         }
-
         $class     = null;
         $namespace = null;
         $allUse    = [];
-        foreach ($ast as $node) {
+        foreach ($newStmts as $node) {
             if ($node instanceof Stmt\Namespace_) {
                 $namespace = &$node;
                 foreach ($node->stmts as &$stmt) {
@@ -235,13 +253,12 @@ class UpdateDataClassGenerator extends Generator
             $class->setDocComment(new Doc($this->makeComment($comment)));
         }
 
-        // 生成代码并格式化
-        $php = $this->getPhpCode($ast);
+        $newCode = $printer->printFormatPreserving($newStmts, $oldStmts, $oldTokens);
         if ($this->config->getAddFunc()) {
-            $fixToArrayFunc = new FixToArrayFunc($php);
-            $php            = $fixToArrayFunc->fix();
+            $fixToArrayFunc = new FixToArrayFunc($newCode);
+            $newCode        = $fixToArrayFunc->fix();
         }
-        return $this->fixPhpCode($php);
+        return $this->fixPhpCode($newCode);
     }
 
     private function getPropertyType(Stmt\Property $property)
