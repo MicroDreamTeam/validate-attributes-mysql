@@ -257,10 +257,6 @@ class UpdateDataClassGenerator extends Generator
         }
 
         $newCode = $printer->printFormatPreserving($newStmts, $oldStmts, $oldTokens);
-        if ($this->config->getAddFunc()) {
-            $fixToArrayFunc = new FixToArrayFunc($newCode);
-            $newCode        = $fixToArrayFunc->fix();
-        }
         return $this->fixPhpCode($newCode);
     }
 

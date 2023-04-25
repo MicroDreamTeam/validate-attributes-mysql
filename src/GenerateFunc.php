@@ -409,11 +409,26 @@ class GenerateFunc
         $method = $this->builder->method('toArray');
         $method->makePublic();
         $method->setReturnType('array');
+        $stmts   = [];
+        $stmts[] = new Expression(
+            new Assign(
+                new Variable('array'),
+                new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
+            )
+        );
         $array = new Array_();
         foreach ($fields as $field) {
-            $array->items[] = new ArrayItem(new PropertyFetch(new Variable('this'), $field), new String_($field));
+            $arrayItem      = new ArrayItem(new String_($field));
+            $array->items[] = $arrayItem;
         }
-        $method->addStmt(new Return_($array));
+
+        $stmts[] = new Return_(new FuncCall(new Name('array_intersect_key'), [
+            new Arg(new Variable('array')),
+            new Arg(new FuncCall(new Name('array_flip'), [
+                new Arg($array)
+            ]))
+        ]));
+        $method->addStmts($stmts);
         $this->addStmt($method->getNode());
     }
 }

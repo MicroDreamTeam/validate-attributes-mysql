@@ -84,7 +84,7 @@ class NewDataClassGenerator extends Generator
             }
 
             $methodGenerator->addToArrayFunc($fields);
-            $comment = $this->getMethodComment($fieldHandler);
+            $comment     = $this->getMethodComment($fieldHandler);
         }
 
         if ($this->config->getAddComment()) {
@@ -106,10 +106,6 @@ class NewDataClassGenerator extends Generator
         $namespace->addStmt($class);
         $ast = $namespace->getNode();
         $php = $this->getPhpCode([$ast]);
-        if ($this->config->getAddFunc()) {
-            $fixToArrayFunc = new FixToArrayFunc($php);
-            $php            = $fixToArrayFunc->fix();
-        }
         return $this->fixPhpCode($php);
     }
 
