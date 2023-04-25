@@ -311,9 +311,6 @@ class Generator
         }
 
         $field->setType($fieldInfo->type);
-        if (!$propertyReadOnly && !($fieldInfo->default instanceof None)) {
-            $field->setDefault($fieldInfo->default);
-        }
 
         if ($addComment && !empty($fieldInfo->comment)) {
             $field->setDocComment(self::makeComment($fieldInfo->comment));

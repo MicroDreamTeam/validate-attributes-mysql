@@ -56,14 +56,9 @@ class FieldHandler
             $field = new FieldInfo($key);
             $type  = strtolower($this->typeMap[$columns[$key]->type]) ?? 'mixed';
             if (!$columns[$key]->notNull && 'mixed' !== $type) {
-                $field->default = $this->getDefaultValue($columns[$key]->default, $type);
-                $field->type    = "?$type";
+                $field->type = "?$type";
             } else {
                 $field->type = $type;
-                $default     = $this->getDefaultValue($columns[$key]->default, $type);
-                if (!is_null($default)) {
-                    $field->default = $default;
-                }
             }
 
             $field->commentType = str_replace('?', 'null|', $field->type);
@@ -71,24 +66,6 @@ class FieldHandler
             $field->attribute   = $value;
             $this->fields[$key] = $field;
         }
-    }
-
-    public function sort(): static
-    {
-        uasort($this->fields, function (FieldInfo $a, FieldInfo $b) {
-            return $b->default instanceof None <=> $a->default instanceof None;
-        });
-        return $this;
-    }
-
-    public function addDefault(): static
-    {
-        $this->each(function (FieldInfo $field) {
-            if ($field->default instanceof None) {
-                $field->default = $this->getDefaultForType($field->type);
-            }
-        });
-        return $this;
     }
 
     public function getFields(): array
@@ -123,20 +100,5 @@ class FieldHandler
         }
 
         return $default;
-    }
-
-    public static function getDefaultForType(string $type): mixed
-    {
-        if (str_contains($type, '?')) {
-            return null;
-        }
-
-        return match ($type) {
-            'int', 'float' => 0,
-            'bool'   => false,
-            'string' => '',
-            'array'  => [],
-            default  => null,
-        };
     }
 }
