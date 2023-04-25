@@ -5,6 +5,9 @@ namespace Itwmw\Validate\Attributes\Mysql;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\AttributeGroup;
 
+/**
+ * @internal
+ */
 class FieldInfo
 {
     /**

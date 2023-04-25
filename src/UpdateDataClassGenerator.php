@@ -13,6 +13,9 @@ use PhpParser\Parser;
 use PhpParser\NodeVisitor;
 use PhpParser\PrettyPrinter;
 
+/**
+ * @internal
+ */
 class UpdateDataClassGenerator extends Generator
 {
     public function make(string $table, string $phpCode, string $namespace_string = null, string $class_name = null): bool|string

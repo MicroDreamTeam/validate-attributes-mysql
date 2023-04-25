@@ -7,6 +7,9 @@ use PhpParser\Builder\Class_;
 use PhpParser\Builder\Trait_;
 use PhpParser\BuilderFactory;
 
+/**
+ * @internal
+ */
 class NewDataClassGenerator extends Generator
 {
     public function make(string $table, string $namespace_string = null, string $class_name = null): string
