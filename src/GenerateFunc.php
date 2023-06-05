@@ -413,7 +413,9 @@ class GenerateFunc
         $stmts[] = new Expression(
             new Assign(
                 new Variable('array'),
-                new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
+                new FuncCall(new Name('get_object_vars'), [
+                    new Arg(new Variable('this'))
+                ])
             )
         );
         $array = new Array_();
