@@ -399,7 +399,9 @@ class GenerateFunc
         $toArrayFunc->makePublic();
         $toArrayFunc->setReturnType('array');
         $toArrayFunc->addStmt(new Return_(
-            new \PhpParser\Node\Expr\Cast\Array_(new Variable('this'))
+            new FuncCall(new Name('get_object_vars'), [
+                new Arg(new Variable('this'))
+            ])
         ));
         $this->addStmt($toArrayFunc->getNode());
     }
